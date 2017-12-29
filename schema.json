@@ -1,0 +1,13 @@
+{
+  "type": "object",
+  "properties": {
+    "serverURL": {
+      "title": "Server URL",
+      "description": "The server URL to send reports to.",
+      "type": "string"
+    },
+    "key": {
+      "type": "string"
+    }
+  }
+}

@@ -1,0 +1,32 @@
+{
+  "manifest_version": 2,
+
+  "name": "ChromeSal",
+  "description": "This extension allows ChromeOS devices to report to Sal",
+  "version": "1.0",
+
+  "browser_action": {
+    "default_icon": "icon.png",
+    "default_title": "CLICK HERE",
+    "default_popup": "popup.html"
+  },
+  "permissions": [
+    "system.memory",
+    "system.cpu",
+    "https://*/*",
+    "http://*/*",
+    "signedInDevices",
+    "system.storage",
+    "management",
+    "runtime",
+    "storage",
+    "enterprise.deviceAttributes"
+  ],
+  "options_ui": {
+    "page": "options.html",
+    "chrome_style": true
+  },
+  "storage": {
+    "managed_schema": "schema.json"
+  }
+}
