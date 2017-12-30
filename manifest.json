@@ -2,7 +2,7 @@
   "manifest_version": 2,
 
   "name": "ChromeSal",
-  "description": "This extension allows ChromeOS devices to report to Sal",
+  "description": "This extension allows ChromeOS devices to report to Sal. This extension must be installed on a managed device to function.",
   "version": "1.0.0.6",
 
   "browser_action": {
