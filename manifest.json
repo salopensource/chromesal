@@ -9,6 +9,10 @@
     "default_icon": "icons/active_128.png",
     "default_popup": "popup.html"
   },
+   "background": {
+    "persistent": true,
+    "scripts": ["plist_parser.js", "jquery.js", "popup.js", "background.js"]
+  },
   "short_name": "ChromeSal",
   "permissions": [
     "system.memory",
@@ -19,7 +23,8 @@
     "system.storage",
     "management",
     "storage",
-    "enterprise.deviceAttributes"
+    "enterprise.deviceAttributes",
+    "alarms"
   ],
   "options_ui": {
     "page": "options.html",

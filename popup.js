@@ -22,7 +22,11 @@ var serverURL = 'https://sal-dev.grahamgilbert.com';
 // }
 
 function renderStatus(statusText) {
-  document.getElementById('status').textContent = statusText;
+  try {
+    document.getElementById('status').textContent = statusText;
+  } catch(err) {
+    console.log(statusText);
+  }
 }
 
 function sendBackDeviceName(devices){
@@ -164,35 +168,38 @@ function getDeviceSerial() {
 }
 
 function getExtensionVersion() {
-    var version = 'NaN';
-    var xhr = new XMLHttpRequest();
-    xhr.open('GET', chrome.extension.getURL('manifest.json'), false);
-    xhr.send(null);
-    var manifest = JSON.parse(xhr.responseText);
-    return manifest.version;
-  }
+  var version = 'NaN';
+  var xhr = new XMLHttpRequest();
+  xhr.open('GET', chrome.extension.getURL('manifest.json'), false);
+  xhr.send(null);
+  var manifest = JSON.parse(xhr.responseText);
+  return manifest.version;
+}
+
+function main() {
+  renderStatus('Running chromesal ' +getExtensionVersion());
+    
+  // chrome.management.getAll(function(info){
+  //   // Extensions
+  //   console.log(info);
+  // });
+
+  
+  data.key = key;
+  data.os_family = 'Linux';
+  data.run_uuid = guid();
+  data.sal_version = '0.0.1';
+  
+  getDeviceSerial();
+  populateDevices();
+  getCPUInfo();
+  getStorageInfo();
+  getOsVersion();
+  getMemInfo();
+  
+  continueExec(report);
+}
   
 document.addEventListener('DOMContentLoaded', function() {
-    renderStatus('Running chromesal ' +getExtensionVersion());
-    
-    // chrome.management.getAll(function(info){
-    //   // Extensions
-    //   console.log(info);
-    // });
-
-    
-    data.key = key;
-    data.os_family = 'Linux';
-    data.run_uuid = guid();
-    data.sal_version = '0.0.1';
-    
-    getDeviceSerial();
-    populateDevices();
-    getCPUInfo();
-    getStorageInfo();
-    getOsVersion();
-    getMemInfo();
-    
-    continueExec(report);
-
+  main()
 });
