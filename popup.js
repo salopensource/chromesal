@@ -4,22 +4,17 @@
  
  
 // Set up some globals
-var debug = false;
+var debug = true;
 var data = {};
 var report = {};
 report.MachineInfo = {};
 report.MachineInfo.HardwareInfo = {};
 var callbackCount = 0;
-var callbackTotal = 6;
+var callbackTotal = 7;
 var doNotSend = false;
 
-var key = 'jfba4w8bex6si8yf2ox32kdilzn5aqctltzguowsc6rwbppw03uyk3qr9g9r9jdqr6ly7tdwemf1j135pqcl83qrag4gizkg9etiakpqsd8cgvsmbnl0abw490cegduv';
-var serverURL = 'https://sal-dev.grahamgilbert.com';
-// if (debug === true) {
-//   deviceSerial = 'abc123';
-// } else {
-  
-// }
+var key = '';
+var serverURL = '';
 
 function renderStatus(statusText) {
   try {
@@ -153,15 +148,16 @@ function getDeviceSerial() {
       });
     }
     catch(err) {
-      console.log('Not a managed chrome device');
-      renderStatus('Only functional on a managed Chrome OS device');
+      
       data.serial = 'abb123';
-      chrome.browserAction.setIcon({
-        path : "./icons/inactive_128.png"
-      });
       console.log(err);
       if (debug === false) {
         doNotSend = true;
+        console.log('Not a managed chrome device');
+        renderStatus('Only functional on a managed Chrome OS device');
+        chrome.browserAction.setIcon({
+          path : "./icons/inactive_128.png"
+        });
       }
     }
     callbackCount++;
@@ -176,6 +172,21 @@ function getExtensionVersion() {
   return manifest.version;
 }
 
+function getSettings(){
+  chrome.storage.managed.get('key', d => {
+    if (d.key) {
+      key = d.key;
+    }
+  });
+  
+  chrome.storage.managed.get('serverURL', d => {
+    if (d.serverURL) {
+      key = d.serverURL;
+    }
+  });
+  callbackCount++;
+}
+
 function main() {
   renderStatus('Running chromesal ' +getExtensionVersion());
     
@@ -183,7 +194,8 @@ function main() {
   //   // Extensions
   //   console.log(info);
   // });
-
+  
+  getSettings();
   
   data.key = key;
   data.os_family = 'Linux';
