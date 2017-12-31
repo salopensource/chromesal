@@ -105,7 +105,7 @@ function s4() {
 
 function continueExec() {
   //here is the trick, wait until var callbackCount is set number of callback functions
-  if (callbackCount < callbackTotal) {
+  if (callbackCount < callbackTotal || data.serial === '') {
     setTimeout(continueExec, 1000);
     return;
   }
@@ -145,15 +145,17 @@ function getDeviceSerial() {
           renderStatus(deviceId);
           console.log(deviceId);
           data.serial = deviceId;
+          if (data.serial === '') {
+            throw 'No Serial returned'
+          }
       });
     }
     catch(err) {
-      
-      data.serial = 'abb123';
+      data.serial = 'abc123';
+      console.log('Not a managed chrome device');
       console.log(err);
       if (debug === false) {
         doNotSend = true;
-        console.log('Not a managed chrome device');
         renderStatus('Only functional on a managed Chrome OS device');
         chrome.browserAction.setIcon({
           path : "./icons/inactive_128.png"
@@ -173,17 +175,12 @@ function getExtensionVersion() {
 }
 
 function getSettings(){
-  chrome.storage.managed.get('key', d => {
-    if (d.key) {
-      key = d.key;
-    }
+  chrome.storage.managed.get(null, function(adminConfig) {
+    console.log("chrome.storage.managed.get adminConfig: ", adminConfig);
+    data.key = adminConfig['key'];
+    serverURL = adminConfig['serverURL'];
   });
-  
-  chrome.storage.managed.get('serverURL', d => {
-    if (d.serverURL) {
-      key = d.serverURL;
-    }
-  });
+  console.log(data.key);
   callbackCount++;
 }
 
@@ -197,7 +194,6 @@ function main() {
   
   getSettings();
   
-  data.key = key;
   data.os_family = 'Linux';
   data.run_uuid = guid();
   data.sal_version = '0.0.1';

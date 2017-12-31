@@ -1,10 +1,8 @@
 {
   "manifest_version": 2,
-
   "name": "ChromeSal",
   "description": "This extension allows ChromeOS devices to report to Sal. This extension must be installed on a managed device to function.",
-  "version": "1.0.0.8",
-
+  "version": "1.0.0.14",
   "browser_action": {
     "default_icon": "icons/active_128.png",
     "default_popup": "popup.html"
