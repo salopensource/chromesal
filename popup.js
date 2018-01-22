@@ -4,7 +4,7 @@
  
  
 // Set up some globals
-var debug = true;
+var debug = false;
 var data = {};
 var report = {};
 report.MachineInfo = {};
@@ -187,10 +187,10 @@ function getSettings(){
 function main() {
   renderStatus('Running chromesal ' +getExtensionVersion());
     
-  // chrome.management.getAll(function(info){
-  //   // Extensions
-  //   console.log(info);
-  // });
+  chrome.management.getAll(function(info){
+    // Extensions
+    console.log(info);
+  });
   
   getSettings();
   
