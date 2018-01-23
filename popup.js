@@ -127,7 +127,7 @@ function sendData(){
       url: serverURL + '/checkin/',
       data: data,
             beforeSend: function (xhr) {
-          xhr.setRequestHeader ("Authorization", "Basic " + btoa("sal:" + key));
+          xhr.setRequestHeader ("Authorization", "Basic " + btoa("sal:" + data.key));
       },
       success: function(received) {
           console.log(received);
