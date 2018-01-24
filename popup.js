@@ -1,5 +1,5 @@
 /**
- * The meat of ChromeSal - gets hardware information and one day will ship it to Sal.
+ * The meat of ChromeSal.
  **/
  
  
@@ -10,8 +10,9 @@ var report = {};
 report.MachineInfo = {};
 report.MachineInfo.HardwareInfo = {};
 var callbackCount = 0;
-var callbackTotal = 7;
+var callbackTotal = 8;
 var doNotSend = false;
+var appInventory = [];
 
 var key = '';
 var serverURL = '';
@@ -117,11 +118,16 @@ function sendData(){
   var reportPlist = PlistParser.toPlist(report);
   if (doNotSend === true) {
     console.log('Not running on a managed device, not sending report');
+    renderStatus('Only functional on a managed Chrome OS device');
+    chrome.browserAction.setIcon({
+      path : "./icons/inactive_128.png"
+    });
     return;
   }
   console.log(reportPlist);
   console.log(data);
   data.base64report = btoa(reportPlist);
+  
   jQuery.ajax({
       type: "POST",
       url: serverURL + '/checkin/',
@@ -137,6 +143,23 @@ function sendData(){
       }
   });
   
+  var inventoryReport = {};
+  var inventoryPlist = PlistParser.toPlist(appInventory);
+  inventoryReport.base64inventory = btoa(inventoryPlist);
+  jQuery.ajax({
+      type: "POST",
+      url: serverURL + '/inventory/submit/',
+      data: data,
+            beforeSend: function (xhr) {
+          xhr.setRequestHeader ("Authorization", "Basic " + btoa("sal:" + data.key));
+      },
+      success: function(received) {
+          console.log(received);
+      },
+      error: function(received) {
+          console.log(received.responseText);
+      }
+  });
 }
 
 function getDeviceSerial() {
@@ -147,6 +170,7 @@ function getDeviceSerial() {
           data.serial = deviceId;
           if (data.serial === '') {
             throw 'No Serial returned'
+            doNotSend = true;
           }
       });
     }
@@ -156,10 +180,6 @@ function getDeviceSerial() {
       console.log(err);
       if (debug === false) {
         doNotSend = true;
-        renderStatus('Only functional on a managed Chrome OS device');
-        chrome.browserAction.setIcon({
-          path : "./icons/inactive_128.png"
-        });
       }
     }
     callbackCount++;
@@ -174,23 +194,36 @@ function getExtensionVersion() {
   return manifest.version;
 }
 
+function getExtensions() {
+    chrome.management.getAll(function(info){
+    // Extensions
+    
+    info.forEach( function(extension){
+      var inventory_item = {};
+      inventory_item.name = extension.name;
+      inventory_item.bundleid = extension.id;
+      inventory_item.version= extension.version;
+      appInventory.push(inventory_item)
+    });
+    
+    
+    callbackCount++;
+    });
+}
+
 function getSettings(){
   chrome.storage.managed.get(null, function(adminConfig) {
-    console.log("chrome.storage.managed.get adminConfig: ", adminConfig);
+    //console.log("chrome.storage.managed.get adminConfig: ", adminConfig);
     data.key = adminConfig['key'];
     serverURL = adminConfig['serverURL'];
   });
-  console.log(data.key);
+  // console.log(data.key);
   callbackCount++;
 }
 
 function main() {
   renderStatus('Running chromesal ' +getExtensionVersion());
-    
-  chrome.management.getAll(function(info){
-    // Extensions
-    console.log(info);
-  });
+
   
   getSettings();
   
@@ -204,8 +237,9 @@ function main() {
   getStorageInfo();
   getOsVersion();
   getMemInfo();
+  getExtensions();
   
-  continueExec(report);
+  continueExec();
 }
   
 document.addEventListener('DOMContentLoaded', function() {
