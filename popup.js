@@ -124,8 +124,8 @@ function sendData(){
     });
     return;
   }
-  console.log(reportPlist);
-  console.log(data);
+  // console.log(reportPlist);
+  // console.log(data);
   data.base64report = btoa(reportPlist);
   
   jQuery.ajax({
@@ -146,6 +146,7 @@ function sendData(){
   var inventoryReport = {};
   var inventoryPlist = PlistParser.toPlist(appInventory);
   inventoryReport.base64inventory = btoa(inventoryPlist);
+  inventoryReport.serial = data.serial;
   jQuery.ajax({
       type: "POST",
       url: serverURL + '/inventory/submit/',
@@ -170,7 +171,9 @@ function getDeviceSerial() {
           data.serial = deviceId;
           if (data.serial === '') {
             throw 'No Serial returned'
-            doNotSend = true;
+            if (debug === false) {
+              doNotSend = true;
+            }
           }
       });
     }
