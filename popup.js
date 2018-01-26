@@ -6,11 +6,12 @@
 // Set up some globals
 var debug = false;
 var data = {};
+data.sal_version = '';
 var report = {};
 report.MachineInfo = {};
 report.MachineInfo.HardwareInfo = {};
 var callbackCount = 0;
-var callbackTotal = 8;
+var callbackTotal = 10;
 var doNotSend = false;
 var appInventory = [];
 
@@ -54,7 +55,7 @@ function sendBackCPUInfo(info) {
   if (report.MachineInfo.HardwareInfo.cpu_type.endsWith('CPU ')){
     report.MachineInfo.HardwareInfo.cpu_type = report.MachineInfo.HardwareInfo.cpu_type.slice(0, -4).trim()
   }
-  report.MachineInfo.HardwareInfo.current_processor_speed = cpu_array[1];
+  report.MachineInfo.HardwareInfo.current_processor_speed = cpu_array[1].trim();
   callbackCount++;
 }
 
@@ -106,7 +107,8 @@ function s4() {
 
 function continueExec() {
   //here is the trick, wait until var callbackCount is set number of callback functions
-  if (callbackCount < callbackTotal || data.serial === '') {
+  if (callbackCount < callbackTotal || checkForData() === false) {
+    console.log('Waiting for data');
     setTimeout(continueExec, 1000);
     return;
   }
@@ -114,9 +116,76 @@ function continueExec() {
   sendData();
 }
 
+function buildInventoryPlist(appInventory){
+  // I hate you, javascript.
+  var xml = '<?xml version="1.0" encoding="UTF-8"?>';
+  xml += '<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">';
+
+  var container = document.createElement('xml');
+  var plist = document.createElement('plist');
+  plist.setAttribute('version','1.0');
+  container.appendChild(plist);
+  var root = document.createElement('array');
+  plist.appendChild(root);
+  
+  appInventory.forEach( function(extension){
+    var dict = document.createElement('dict');
+    var key = document.createElement('key');
+    key.innerHTML = 'name';
+    dict.appendChild(key);
+    var string = document.createElement('string');
+    string.innerHTML = extension.name;
+    dict.appendChild(string);
+    
+    key = document.createElement('key');
+    key.innerHTML = 'bundleid';
+    dict.appendChild(key);
+    string = document.createElement('string');
+    string.innerHTML = extension.bundleid;
+    dict.appendChild(string);
+    
+    key = document.createElement('key');
+    key.innerHTML = 'version';
+    dict.appendChild(key);
+    string = document.createElement('string');
+    string.innerHTML = extension.version;
+    dict.appendChild(string);
+
+    root.appendChild(dict)
+  });
+  
+  
+  return xml+container.innerHTML;
+  
+  
+}
+
+function checkForData(){
+  if (data.key === '') {
+    return false;
+  }
+  
+  if (data.serial === '') {
+    return false;
+  }
+  
+  if (serverURL === '') {
+    return false;
+  }
+  
+  if (data.sal_version === '') {
+    return false;
+  }
+  
+  if (data.sal_version === null) {
+    return false;
+  }
+}
+
 function sendData(){
+  report.os_family = 'Linux';
   var reportPlist = PlistParser.toPlist(report);
-  if (doNotSend === true) {
+  if (doNotSend === true && debug === false) {
     console.log('Not running on a managed device, not sending report');
     renderStatus('Only functional on a managed Chrome OS device');
     chrome.browserAction.setIcon({
@@ -127,7 +196,12 @@ function sendData(){
   // console.log(reportPlist);
   // console.log(data);
   data.base64report = btoa(reportPlist);
-  
+  renderStatus('Running chromesal ' +data.sal_version);
+  // console.log(data)
+  if (debug===true){
+    console.log(data);
+  }
+  // console.log(buildInventoryPlist(appInventory));
   jQuery.ajax({
       type: "POST",
       url: serverURL + '/checkin/',
@@ -137,38 +211,39 @@ function sendData(){
       },
       success: function(received) {
           console.log(received);
+          var inventoryPlist = buildInventoryPlist(appInventory);
+          // console.log(buildInventoryPlist(appInventory));
+          // console.log(inventoryPlist);
+          data.base64inventory = btoa(inventoryPlist);
+          // console.log(data);
+          jQuery.ajax({
+              type: "POST",
+              url: serverURL + '/inventory/submit/',
+              data: data,
+                    beforeSend: function (xhr) {
+                  xhr.setRequestHeader ("Authorization", "Basic " + btoa("sal:" + data.key));
+              },
+              success: function(received) {
+                  console.log(received);
+              },
+              error: function(received) {
+                  // console.log(received.responseText);
+              }
+          });
       },
       error: function(received) {
           console.log(received.responseText);
       }
   });
-  
-  var inventoryReport = {};
-  var inventoryPlist = PlistParser.toPlist(appInventory);
-  inventoryReport.base64inventory = btoa(inventoryPlist);
-  inventoryReport.serial = data.serial;
-  jQuery.ajax({
-      type: "POST",
-      url: serverURL + '/inventory/submit/',
-      data: data,
-            beforeSend: function (xhr) {
-          xhr.setRequestHeader ("Authorization", "Basic " + btoa("sal:" + data.key));
-      },
-      success: function(received) {
-          console.log(received);
-      },
-      error: function(received) {
-          console.log(received.responseText);
-      }
-  });
+
 }
 
 function getDeviceSerial() {
   try {
       chrome.enterprise.deviceAttributes.getDirectoryDeviceId(deviceId => {
           renderStatus(deviceId);
-          console.log(deviceId);
-          data.serial = deviceId;
+          // console.log(deviceId);
+          data.serial = deviceId.toUpperCase();
           if (data.serial === '') {
             throw 'No Serial returned'
             if (debug === false) {
@@ -178,9 +253,11 @@ function getDeviceSerial() {
       });
     }
     catch(err) {
-      data.serial = 'abc123';
+      data.serial = 'abc123'.toUpperCase();
       console.log('Not a managed chrome device');
-      console.log(err);
+      if (debug === true){
+        console.log(err);
+      }
       if (debug === false) {
         doNotSend = true;
       }
@@ -189,12 +266,26 @@ function getDeviceSerial() {
 }
 
 function getExtensionVersion() {
-  var version = 'NaN';
-  var xhr = new XMLHttpRequest();
-  xhr.open('GET', chrome.extension.getURL('manifest.json'), false);
-  xhr.send(null);
-  var manifest = JSON.parse(xhr.responseText);
-  return manifest.version;
+  callbackCount++;
+  console.log('Extension version callback');
+  chrome.runtime.getPackageDirectoryEntry(function (dirEntry) {
+    dirEntry.getFile("manifest.json", undefined, function (fileEntry) {
+    fileEntry.file(function (file) {
+            var reader = new FileReader()
+            reader.addEventListener("load", function (event) {
+                // data now in reader.result
+                // console.log(reader.result);
+                var manifest = JSON.parse(reader.result);
+                console.log(manifest.version);
+                data.sal_version =  manifest.version;
+            });
+            reader.readAsText(file);
+        });
+    }, function (e) {
+        console.log(e);
+    });
+  });
+  
 }
 
 function getExtensions() {
@@ -209,30 +300,52 @@ function getExtensions() {
       appInventory.push(inventory_item)
     });
     
-    
     callbackCount++;
+    console.log('Extension list callback');
     });
 }
 
 function getSettings(){
+  
+chrome.runtime.getPackageDirectoryEntry(function (dirEntry) {
+    dirEntry.getFile("settings.json", undefined, function (fileEntry) {
+    fileEntry.file(function (file) {
+            var reader = new FileReader()
+            reader.addEventListener("load", function (event) {
+                // data now in reader.result
+                var settings = JSON.parse(reader.result);
+                console.log('Using local settings file');
+                console.log(settings.debug);
+                data.key = settings.key;
+                serverURL = settings.serverURL;
+                debug = settings.debug;
+                callbackCount++;
+                return;
+            });
+            reader.readAsText(file);
+        });
+    }, function (e) {
+        //console.log(e);
+    });
+  });
   chrome.storage.managed.get(null, function(adminConfig) {
+    
     //console.log("chrome.storage.managed.get adminConfig: ", adminConfig);
     data.key = adminConfig['key'];
     serverURL = adminConfig['serverURL'];
   });
   // console.log(data.key);
   callbackCount++;
+  
 }
 
 function main() {
-  renderStatus('Running chromesal ' +getExtensionVersion());
+  
 
   
   getSettings();
-  
-  data.os_family = 'Linux';
   data.run_uuid = guid();
-  data.sal_version = '0.0.1';
+  getExtensionVersion();
   
   getDeviceSerial();
   populateDevices();
