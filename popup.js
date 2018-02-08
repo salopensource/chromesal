@@ -108,6 +108,15 @@ function s4() {
 
 function continueExec() {
   //here is the trick, wait until var callbackCount is set number of callback functions
+  if (doNotSend === true && debug === false) {
+    console.log(doNotSend)
+    console.log('Not running on a managed device, not sending report');
+    renderStatus('Only functional on a managed Chrome OS device');
+    chrome.browserAction.setIcon({
+      path : "./icons/inactive_128.png"
+    });
+    return;
+  }
   if (callbackCount < callbackTotal || checkForData() === false) {
     console.log('Waiting for data');
     setTimeout(continueExec, 1000);
@@ -186,15 +195,6 @@ function checkForData(){
 function sendData(){
   report.os_family = 'Linux';
   var reportPlist = PlistParser.toPlist(report);
-  if (doNotSend === true && debug === false) {
-    console.log(doNotSend)
-    console.log('Not running on a managed device, not sending report');
-    renderStatus('Only functional on a managed Chrome OS device');
-    chrome.browserAction.setIcon({
-      path : "./icons/inactive_128.png"
-    });
-    return;
-  }
   // console.log(reportPlist);
   // console.log(data);
   data.base64report = btoa(reportPlist);
