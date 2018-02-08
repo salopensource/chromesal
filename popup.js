@@ -11,9 +11,10 @@ var report = {};
 report.MachineInfo = {};
 report.MachineInfo.HardwareInfo = {};
 var callbackCount = 0;
-var callbackTotal = 10;
+var callbackTotal = 11;
 var doNotSend = false;
 var appInventory = [];
+var chromeOS = false;
 
 var key = '';
 var serverURL = '';
@@ -186,6 +187,7 @@ function sendData(){
   report.os_family = 'Linux';
   var reportPlist = PlistParser.toPlist(report);
   if (doNotSend === true && debug === false) {
+    console.log(doNotSend)
     console.log('Not running on a managed device, not sending report');
     renderStatus('Only functional on a managed Chrome OS device');
     chrome.browserAction.setIcon({
@@ -262,7 +264,27 @@ function getDeviceSerial() {
         doNotSend = true;
       }
     }
+    // We are only going to run on a Chrome OS device
+    is_chrome = getOsType();
+    if (is_chrome === false) {
+      doNotSend = true;
+    }
     callbackCount++;
+}
+
+function getOsType() {
+  chrome.runtime.getPlatformInfo(function(info) {
+    chromeOS = false;
+    if (info.os === 'cros'){
+      chromeOS = true;
+    } else {
+      if (debug === true) {
+        chromeOS = true;
+      }
+    }
+  });
+  callbackCount++;
+  return chromeOS
 }
 
 function getExtensionVersion() {
@@ -317,7 +339,7 @@ chrome.runtime.getPackageDirectoryEntry(function (dirEntry) {
                 console.log('Using local settings file');
                 console.log(settings.debug);
                 data.key = settings.key;
-                serverURL = settings.serverURL;
+                serverURL = settings.serverurl;
                 debug = settings.debug;
                 callbackCount++;
                 return;
@@ -332,7 +354,7 @@ chrome.runtime.getPackageDirectoryEntry(function (dirEntry) {
     
     //console.log("chrome.storage.managed.get adminConfig: ", adminConfig);
     data.key = adminConfig['key'];
-    serverURL = adminConfig['serverURL'];
+    serverURL = adminConfig['serverurl'];
   });
   // console.log(data.key);
   callbackCount++;
