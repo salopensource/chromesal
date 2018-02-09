@@ -11,10 +11,9 @@ var report = {};
 report.MachineInfo = {};
 report.MachineInfo.HardwareInfo = {};
 var callbackCount = 0;
-var callbackTotal = 11;
+var callbackTotal = 10;
 var doNotSend = false;
 var appInventory = [];
-var chromeOS = false;
 
 var key = '';
 var serverURL = '';
@@ -109,12 +108,7 @@ function s4() {
 function continueExec() {
   //here is the trick, wait until var callbackCount is set number of callback functions
   if (doNotSend === true && debug === false) {
-    console.log(doNotSend)
-    console.log('Not running on a managed device, not sending report');
-    renderStatus('Only functional on a managed Chrome OS device');
-    chrome.browserAction.setIcon({
-      path : "./icons/inactive_128.png"
-    });
+    exit();
     return;
   }
   if (callbackCount < callbackTotal || checkForData() === false) {
@@ -198,7 +192,6 @@ function sendData(){
   // console.log(reportPlist);
   // console.log(data);
   data.base64report = btoa(reportPlist);
-  renderStatus('Running chromesal ' +data.sal_version);
   // console.log(data)
   if (debug===true){
     console.log(data);
@@ -241,9 +234,16 @@ function sendData(){
 }
 
 function getDeviceSerial() {
+  // We are only going to run on a Chrome OS device
+  is_chrome = getOsType();
+  if (is_chrome === false) {
+    doNotSend = true;
+    exit();
+  }
+
   try {
       chrome.enterprise.deviceAttributes.getDirectoryDeviceId(deviceId => {
-          renderStatus(deviceId);
+          // renderStatus(deviceId);
           // console.log(deviceId);
           data.serial = deviceId.toUpperCase();
           if (data.serial === '') {
@@ -264,18 +264,14 @@ function getDeviceSerial() {
         doNotSend = true;
       }
     }
-    // We are only going to run on a Chrome OS device
-    is_chrome = getOsType();
-    if (is_chrome === false) {
-      doNotSend = true;
-    }
     callbackCount++;
 }
 
 function getOsType() {
   chrome.runtime.getPlatformInfo(function(info) {
-    chromeOS = false;
-    if (info.os === 'cros'){
+    console.log(info.os)
+    var chromeOS = false;
+    if (info.os.toLowerCase().includes('cros')){
       chromeOS = true;
     } else {
       if (debug === true) {
@@ -283,13 +279,11 @@ function getOsType() {
       }
     }
   });
-  callbackCount++;
   return chromeOS
 }
 
 function getExtensionVersion() {
   callbackCount++;
-  console.log('Extension version callback');
   chrome.runtime.getPackageDirectoryEntry(function (dirEntry) {
     dirEntry.getFile("manifest.json", undefined, function (fileEntry) {
     fileEntry.file(function (file) {
@@ -298,8 +292,8 @@ function getExtensionVersion() {
                 // data now in reader.result
                 // console.log(reader.result);
                 var manifest = JSON.parse(reader.result);
-                console.log(manifest.version);
                 data.sal_version =  manifest.version;
+                renderStatus('Running chromesal ' +data.sal_version);
             });
             reader.readAsText(file);
         });
@@ -359,6 +353,14 @@ chrome.runtime.getPackageDirectoryEntry(function (dirEntry) {
   // console.log(data.key);
   callbackCount++;
   
+}
+
+function exit() {
+  console.log('Not running on a managed device, not sending report');
+  renderStatus('Only functional on a managed Chrome OS device');
+  chrome.browserAction.setIcon({
+    path : "./icons/inactive_128.png"
+  });
 }
 
 function main() {
