@@ -1,7 +1,7 @@
 {
   "type": "object",
   "properties": {
-    "serverURL": {
+    "serverurl": {
       "title": "Server URL",
       "description": "The server URL to send reports to.",
       "type": "string"
