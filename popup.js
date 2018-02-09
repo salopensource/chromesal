@@ -108,7 +108,7 @@ function s4() {
 function continueExec() {
   //here is the trick, wait until var callbackCount is set number of callback functions
   if (doNotSend === true && debug === false) {
-    exit();
+    notRunningMessage();
     return;
   }
   if (callbackCount < callbackTotal || checkForData() === false) {
@@ -238,7 +238,7 @@ function getDeviceSerial() {
   is_chrome = getOsType();
   if (is_chrome === false) {
     doNotSend = true;
-    exit();
+    notRunnngMessage();
   }
 
   try {
@@ -270,16 +270,14 @@ function getDeviceSerial() {
 function getOsType() {
   chrome.runtime.getPlatformInfo(function(info) {
     console.log(info.os)
-    var chromeOS = false;
     if (info.os.toLowerCase().includes('cros')){
-      chromeOS = true;
+      return true;
+    } else if (debug === true) {
+      return true;
     } else {
-      if (debug === true) {
-        chromeOS = true;
-      }
+      return false;
     }
   });
-  return chromeOS
 }
 
 function getExtensionVersion() {
@@ -293,7 +291,9 @@ function getExtensionVersion() {
                 // console.log(reader.result);
                 var manifest = JSON.parse(reader.result);
                 data.sal_version =  manifest.version;
-                renderStatus('Running chromesal ' +data.sal_version);
+                if (doNotSend == false){
+                  renderStatus('Running chromesal ' +data.sal_version);
+                }
             });
             reader.readAsText(file);
         });
@@ -355,7 +355,7 @@ chrome.runtime.getPackageDirectoryEntry(function (dirEntry) {
   
 }
 
-function exit() {
+function notRunningMessage() {
   console.log('Not running on a managed device, not sending report');
   renderStatus('Only functional on a managed Chrome OS device');
   chrome.browserAction.setIcon({
