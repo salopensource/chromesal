@@ -13,9 +13,13 @@ The extension has been restricted to Chrome OS devices only, and will not functi
 
 ``` json
 {
-  "debug": false,
-  "serverurl": "https://sal.yourcompany.com",
-  "key": "yourreallylongkey"
+  "serverurl": {
+    "Value": "https://sal.yourcompany.com"
+  },
+
+  "key": {
+    "Value": "yourreallyreallyreallylongkey"
+  }
 }
 ```
 
