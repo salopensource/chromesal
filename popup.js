@@ -324,6 +324,7 @@ function getExtensions() {
 function getSettings(){
   
 chrome.runtime.getPackageDirectoryEntry(function (dirEntry) {
+    callbackCount++;
     dirEntry.getFile("settings.json", undefined, function (fileEntry) {
     fileEntry.file(function (file) {
             var reader = new FileReader()
@@ -335,7 +336,6 @@ chrome.runtime.getPackageDirectoryEntry(function (dirEntry) {
                 data.key = settings.key;
                 serverURL = settings.serverurl;
                 debug = settings.debug;
-                callbackCount++;
                 return;
             });
             reader.readAsText(file);
