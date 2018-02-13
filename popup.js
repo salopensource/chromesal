@@ -155,6 +155,13 @@ function buildInventoryPlist(appInventory){
     string.innerHTML = extension.version;
     dict.appendChild(string);
 
+    key = document.createElement('key');
+    key.innerHTML = 'CFBundleName';
+    dict.appendChild(key);
+    string = document.createElement('string');
+    string.innerHTML = extension.name;
+    dict.appendChild(string);
+
     root.appendChild(dict)
   });
   
