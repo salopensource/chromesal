@@ -11,9 +11,10 @@ var report = {};
 report.MachineInfo = {};
 report.MachineInfo.HardwareInfo = {};
 var callbackCount = 0;
-var callbackTotal = 10;
+var callbackTotal = 9;
 var doNotSend = false;
 var appInventory = [];
+var settingsSet = false;
 
 var key = '';
 var serverURL = '';
@@ -95,7 +96,8 @@ function sendBackMem(info) {
 }
 
 function guid() {
-  return s4() + s4() + '-' + s4() + '-' + s4() + '-' +
+  callbackCount++;
+  data.run_uuid = s4() + s4() + '-' + s4() + '-' + s4() + '-' +
     s4() + '-' + s4() + s4() + s4();
 }
 
@@ -105,19 +107,37 @@ function s4() {
     .substring(1);
 }
 
-function continueExec() {
+function waitForSettings() {
+  // Wait for settings to have run before carrying on
+  if (settingsSet !== true) {
+    console.log('Waiting for settings');
+    setTimeout(waitForSettings, 1000);
+  }
+}
+
+
+function waitForSettings(callback) {
+  if (settingsSet === true) {
+    callback && callback();
+  } else {
+    setTimeout(waitForSettings, 1000, callback);
+  }
+}
+
+async function continueExec() {
+  data_check = await checkForData();
   //here is the trick, wait until var callbackCount is set number of callback functions
   if (doNotSend === true && debug === false) {
     notRunningMessage();
     return;
   }
-  if (callbackCount < callbackTotal || checkForData() === false) {
+  if (callbackCount < callbackTotal || data_check === false) {
     console.log('Waiting for data');
     setTimeout(continueExec, 1000);
     return;
   }
   //Finally, do what you need
-  sendData();
+  setTimeout(sendData, 2000);
 }
 
 function buildInventoryPlist(appInventory){
@@ -132,7 +152,14 @@ function buildInventoryPlist(appInventory){
   var root = document.createElement('array');
   plist.appendChild(root);
   
+  var seen_ids = []
+  console.log(seen_ids);
   appInventory.forEach( function(extension){
+    // if (seen_ids.includes(extension.bundleid)) {
+    //   continue;
+    // } else {
+    //   seen_ids.push(extension.bundleid);
+    // }
     var dict = document.createElement('dict');
     var key = document.createElement('key');
     key.innerHTML = 'name';
@@ -191,6 +218,10 @@ function checkForData(){
   if (data.sal_version === null) {
     return false;
   }
+  
+  if (settingsSet == false){
+    return false
+  }
 }
 
 function sendData(){
@@ -240,22 +271,32 @@ function sendData(){
 
 }
 
-function getDeviceSerial() {
+async function getDeviceSerial() {
   // We are only going to run on a Chrome OS device
-  is_chrome = getOsType();
-  if (is_chrome === false) {
-    doNotSend = true;
-    notRunnngMessage();
-  }
+  chrome.runtime.getPlatformInfo(async function(info) {
+    //console.log(info)
+    if (!info.os.toLowerCase().includes('cros')){
+      if (debug === false) {
+        console.log('Not cros and not debug')
+        doNotSend = true;
+      }
+    }
+  });
+  // console.log('Is chrome: '+is_chrome);
+  // if (is_chrome === false) {
+  //   doNotSend = true;
+  //   // notRunnngMessage();
+  // }
 
   try {
-      chrome.enterprise.deviceAttributes.getDirectoryDeviceId(deviceId => {
+      chrome.enterprise.deviceAttributes.getDirectoryDeviceId(async deviceId => {
           // renderStatus(deviceId);
           // console.log(deviceId);
           data.serial = deviceId.toUpperCase();
           if (data.serial === '') {
             throw 'No Serial returned'
             if (debug === false) {
+              console.log('setting do not send to trye due to no serial being returned and not being debug')
               doNotSend = true;
             }
           }
@@ -268,23 +309,11 @@ function getDeviceSerial() {
         console.log(err);
       }
       if (debug === false) {
+        console.log('setting do not send to trye due to no serial error and not being debug')
         doNotSend = true;
       }
     }
     callbackCount++;
-}
-
-function getOsType() {
-  chrome.runtime.getPlatformInfo(function(info) {
-    console.log(info.os)
-    if (info.os.toLowerCase().includes('cros')){
-      return true;
-    } else if (debug === true) {
-      return true;
-    } else {
-      return false;
-    }
-  });
 }
 
 function getExtensionVersion() {
@@ -328,21 +357,21 @@ function getExtensions() {
     });
 }
 
-function getSettings(){
-  
-chrome.runtime.getPackageDirectoryEntry(function (dirEntry) {
-    callbackCount++;
+async function getSettings(){
+  chrome.runtime.getPackageDirectoryEntry(function (dirEntry) {
     dirEntry.getFile("settings.json", undefined, function (fileEntry) {
     fileEntry.file(function (file) {
             var reader = new FileReader()
-            reader.addEventListener("load", function (event) {
+            reader.addEventListener("load", async function (event) {
                 // data now in reader.result
-                var settings = JSON.parse(reader.result);
+                var settings = await JSON.parse(reader.result);
                 console.log('Using local settings file');
                 console.log(settings.debug);
-                data.key = settings.key;
-                serverURL = settings.serverurl;
-                debug = settings.debug;
+                data.key = await settings.key;
+                serverURL = await settings.serverurl;
+                debug = await settings.debug;
+                callbackCount++;
+                settingsSet = true;
                 return;
             });
             reader.readAsText(file);
@@ -356,9 +385,11 @@ chrome.runtime.getPackageDirectoryEntry(function (dirEntry) {
     //console.log("chrome.storage.managed.get adminConfig: ", adminConfig);
     data.key = adminConfig['key'];
     serverURL = adminConfig['serverurl'];
+    settingsSet = true;
+    callbackCount++;
   });
   // console.log(data.key);
-  callbackCount++;
+  
   
 }
 
@@ -372,21 +403,21 @@ function notRunningMessage() {
 
 function main() {
   
-
-  
   getSettings();
-  data.run_uuid = guid();
-  getExtensionVersion();
+  waitForSettings(function() {
+    guid();
+    getExtensionVersion();
+    getDeviceSerial();
+    populateDevices();
+    getCPUInfo();
+    getStorageInfo();
+    getOsVersion();
+    getMemInfo();
+    getExtensions();
+    
+    continueExec();
+  });
   
-  getDeviceSerial();
-  populateDevices();
-  getCPUInfo();
-  getStorageInfo();
-  getOsVersion();
-  getMemInfo();
-  getExtensions();
-  
-  continueExec();
 }
   
 document.addEventListener('DOMContentLoaded', function() {
