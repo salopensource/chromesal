@@ -357,19 +357,19 @@ function getExtensions() {
     });
 }
 
-async function getSettings(){
+function getSettings(){
   chrome.runtime.getPackageDirectoryEntry(function (dirEntry) {
     dirEntry.getFile("settings.json", undefined, function (fileEntry) {
     fileEntry.file(function (file) {
             var reader = new FileReader()
-            reader.addEventListener("load", async function (event) {
+            reader.addEventListener("load", function (event) {
                 // data now in reader.result
-                var settings = await JSON.parse(reader.result);
+                var settings = JSON.parse(reader.result);
                 console.log('Using local settings file');
                 console.log(settings.debug);
-                data.key = await settings.key;
-                serverURL = await settings.serverurl;
-                debug = await settings.debug;
+                data.key = settings.key;
+                serverURL = settings.serverurl;
+                debug = settings.debug;
                 callbackCount++;
                 settingsSet = true;
                 return;
