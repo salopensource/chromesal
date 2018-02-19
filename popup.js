@@ -225,7 +225,7 @@ function checkForData(){
 }
 
 function sendData(){
-  report.os_family = 'Linux';
+  report.os_family = 'ChromeOS';
   var reportPlist = PlistParser.toPlist(report);
   // console.log(reportPlist);
   // console.log(data);
