@@ -141,59 +141,17 @@ async function continueExec() {
 }
 
 function buildInventoryPlist(appInventory){
-  // I hate you, javascript.
-  // var xml = '<?xml version="1.0" encoding="UTF-8"?>';
-  // xml += '<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">';
-
-  // var container = document.createElement('xml');
-  // var plist = document.createElement('plist');
-  // plist.setAttribute('version','1.0');
-  // container.appendChild(plist);
-  // var root = document.createElement('array');
-  // plist.appendChild(root);
-
   root = []
 
   appInventory.forEach( function(extension){
-    // var dict = document.createElement('dict');
-    // var key = document.createElement('key');
-    // key.innerHTML = 'name';
-    // dict.appendChild(key);
-    // var string = document.createElement('string');
-    // string.innerHTML = extension.name;
-    // dict.appendChild(string);
 
     dict = {}
     dict.bundleid = extension.bundleid;
-    
-    // key = document.createElement('key');
-    // key.innerHTML = 'bundleid';
-    // dict.appendChild(key);
-    // string = document.createElement('string');
-    // string.innerHTML = extension.bundleid;
-    // dict.appendChild(string);
-
     dict.version = extension.version;
-    
-    // key = document.createElement('key');
-    // key.innerHTML = 'version';
-    // dict.appendChild(key);
-    // string = document.createElement('string');
-    // string.innerHTML = extension.version;
-    // dict.appendChild(string);
-
     dict.CFBundleName = extension.name;
-
-    // key = document.createElement('key');
-    // key.innerHTML = 'CFBundleName';
-    // dict.appendChild(key);
-    // string = document.createElement('string');
-    // string.innerHTML = extension.name;
-    // dict.appendChild(string);
+    dict.name = extension.name;
 
     root.push(dict)
-
-    // root.appendChild(dict)
   });
   
   
