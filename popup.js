@@ -151,15 +151,8 @@ function buildInventoryPlist(appInventory){
   container.appendChild(plist);
   var root = document.createElement('array');
   plist.appendChild(root);
-  
-  var seen_ids = []
-  console.log(seen_ids);
+
   appInventory.forEach( function(extension){
-    // if (seen_ids.includes(extension.bundleid)) {
-    //   continue;
-    // } else {
-    //   seen_ids.push(extension.bundleid);
-    // }
     var dict = document.createElement('dict');
     var key = document.createElement('key');
     key.innerHTML = 'name';
@@ -198,6 +191,59 @@ function buildInventoryPlist(appInventory){
   
 }
 
+function addManagedInstalls(report, appInventory){
+  // var root = document.createElement('array');
+  // appInventory.forEach( function(extension){
+  //   if (extension.install_type == 'admin') {
+  //     var dict = document.createElement('dict');
+  //     var key = document.createElement('key');
+  //     key.innerHTML = 'name';
+  //     dict.appendChild(key);
+  //     var string = document.createElement('string');
+  //     string.innerHTML = extension.name;
+  //     dict.appendChild(string);
+      
+  //     key = document.createElement('key');
+  //     key.innerHTML = 'display_name';
+  //     dict.appendChild(key);
+  //     string = document.createElement('string');
+  //     string.innerHTML = extension.name;
+  //     dict.appendChild(string);
+      
+  //     key = document.createElement('key');
+  //     key.innerHTML = 'installed_version';
+  //     dict.appendChild(key);
+  //     string = document.createElement('string');
+  //     string.innerHTML = extension.version;
+  //     dict.appendChild(string);
+
+  //     key = document.createElement('key');
+  //     key.innerHTML = 'installed';
+  //     dict.appendChild(key);
+  //     string = document.createElement('true');
+  //     dict.appendChild(string);
+
+  //     root.appendChild(dict)
+  //   }
+  // });
+
+  var root = [];
+  appInventory.forEach( function(extension){
+    if (extension.install_type == 'admin') {
+      var dict = {}
+      dict.name = extension.name;
+      dict.display_name = extension.display_name;
+      dict.installed = true;
+      dict.installed_version = extension.version;
+      root.push(dict);
+    }
+  });
+
+  console.log(root);
+  report.ManagedInstalls = root;
+  return report;
+}
+
 function checkForData(){
   if (data.key === '') {
     return false;
@@ -226,8 +272,10 @@ function checkForData(){
 
 function sendData(){
   report.os_family = 'ChromeOS';
+  
+  report = addManagedInstalls(report, appInventory);
   var reportPlist = PlistParser.toPlist(report);
-  // console.log(reportPlist);
+  console.log(reportPlist);
   // console.log(data);
   data.base64report = btoa(reportPlist);
   // console.log(data)
@@ -296,7 +344,7 @@ async function getDeviceSerial() {
           if (data.serial === '') {
             throw 'No Serial returned'
             if (debug === false) {
-              console.log('setting do not send to trye due to no serial being returned and not being debug')
+              console.log('setting do not send to true due to no serial being returned and not being debug')
               doNotSend = true;
             }
           }
@@ -345,10 +393,13 @@ function getExtensions() {
     // Extensions
     
     info.forEach( function(extension){
+      // console.logxr(extension)
       var inventory_item = {};
       inventory_item.name = extension.name;
       inventory_item.bundleid = extension.id;
       inventory_item.version= extension.version;
+      inventory_item.install_type = extension.installType;
+      inventory_item.description = extension.description;
       appInventory.push(inventory_item)
     });
     

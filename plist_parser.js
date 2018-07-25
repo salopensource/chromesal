@@ -1,25 +1,32 @@
 /**
+plistparser.js
+Adapted from:
+ https://github.com/pugetive/plist_parser
  PlistParser: a JavaScript utility to process Plist XML into JSON
  @author Todd Gehman (toddgehman@gmail.com)
  Copyright (c) 2010 Todd Gehman
-
- ---
-
- Usage:
-   var jsonString = PlistParser.parse(xmlString);
-
- ---
  
+ some changes 2015 Greg Neagle (gregneagle@mac.com):
+    - PlistParser.toPlist now properly generates <array> items
+    - PlistParser.toPlist can output "pretty formatted" plist strings
+    - collapse "<true></true>" to "<true/>" and "<false></false>" to "<false/>"
+    - changes in date handling
+    - attempt to handle int/float types
+    - work with JavaScript objects instead of JSON strings since JSON is lossy
+      with dates (dates are converted to strings, losing their "date"-ness)
+ --- 
+ Usage:
+   var jsobject= PlistParser.parse(xmlString);
+   var plistString = PlistParser.toPlist(jsobject);
+ ---
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
 in the Software without restriction, including without limitation the rights
 to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
 copies of the Software, and to permit persons to whom the Software is
 furnished to do so, subject to the following conditions:
-
 The above copyright notice and this permission notice shall be included in
 all copies or substantial portions of the Software.
-
 THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
 IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
 FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
@@ -32,27 +39,18 @@ THE SOFTWARE.
 var PlistParser = {};
 
 PlistParser.parse = function(plist_xml){
-  // Special case XML munging if we're running in Appcelerator Titanium
-  try{
-    if (typeof Titanium.XML != 'undefined'){
-      plist_xml = Titanium.XML.parseString(plist_xml);
-    }
-  } catch(e){
+    // parses a plist (text format only) into a JavaScript object
     var parser = new DOMParser();
-		  plist_xml = parser.parseFromString(plist_xml, 'text/xml');
-  }
+    plist_xml = parser.parseFromString(plist_xml, 'text/xml');
     
-  var result = this._xml_to_json(plist_xml.getElementsByTagName('plist').item(0));
+    var result = this._xml_to_js(plist_xml.getElementsByTagName('plist').item(0));
   return result;
 };
 
-PlistParser._xml_to_json = function(xml_node) {
+PlistParser._xml_to_js = function(xml_node) {
   var parser = this;
   var parent_node = xml_node;
   var parent_node_name = parent_node.nodeName;
-
-  // console.log("Working on parent node: ");
-  // console.log(parent_node);
 
   var child_nodes = [];
   for(var i = 0; i < parent_node.childNodes.length; ++i){
@@ -65,25 +63,8 @@ PlistParser._xml_to_json = function(xml_node) {
   switch(parent_node_name){
 
     case 'plist':
-      if (child_nodes.length > 1){
-        // I'm not actually sure if it is legal to have multiple
-        // top-level nodes just below <plist>. But I originally
-        // wrote it to handle an array of nodes at that level,
-        // so I'm leaving this handling in for now.
-        var plist_array = [];
-        for(var i = 0; i < child_nodes.length; ++i){
-           plist_array.push(parser._xml_to_json(child_nodes[i]));
-        };
-        // var plist_hash = {};
-        // plist_hash['plist'] = plist_array;
-        // return plist_hash;
-        return plist_array;
-      } else {
-        // THIS is the standard case. The top-most node under
-        // <plist> is either a <dict> or an <array>.
-        return parser._xml_to_json(child_nodes[0]);
-      }
-      break;
+      
+      return parser._xml_to_js(child_nodes[0]);
 
     case 'dict':
 
@@ -97,7 +78,7 @@ PlistParser._xml_to_json = function(xml_node) {
         } else if (child.nodeName == 'key'){
           key_name = PlistParser._textValue(child.firstChild);
         } else {
-          key_value = parser._xml_to_json(child);
+          key_value = parser._xml_to_js(child);
           dictionary[key_name] = key_value;
         }
       }
@@ -109,7 +90,7 @@ PlistParser._xml_to_json = function(xml_node) {
       var standard_array = [];
       for(var i = 0; i < child_nodes.length; ++i){
         var child = child_nodes[i];
-        standard_array.push(parser._xml_to_json(child));
+        standard_array.push(parser._xml_to_js(child));
       }
       return standard_array;
 
@@ -119,12 +100,20 @@ PlistParser._xml_to_json = function(xml_node) {
 
     case 'date':
 
-      var date = PlistParser._parseDate(PlistParser._textValue(parent_node));
-      return date.toString();
+      var textvalue = PlistParser._textValue(parent_node),
+          timestamp = Date.parse(textvalue);
+      if (isNaN(timestamp)) {
+          if (window.console) { 
+              console.error('Invalid date string in plist: ' + textvalue);
+          }
+          timestamp = 0; 
+      }
+      return new Date(timestamp);
 
     case 'integer':
     
-      // Second argument (radix parameter) forces string to be interpreted in base 10.
+      // Second argument (radix parameter) forces string to be interpreted in 
+      // base 10.
       return parseInt(PlistParser._textValue(parent_node), 10);
 
     case 'real':
@@ -133,6 +122,8 @@ PlistParser._xml_to_json = function(xml_node) {
 
     case 'data':
 
+    // TO-DO: we should define a data object so we can differentiate between
+    // string and data objects
       return PlistParser._textValue(parent_node);
 
     case 'true':
@@ -140,13 +131,9 @@ PlistParser._xml_to_json = function(xml_node) {
       return true;
 
     case 'false':
-    
-      return false;
-      
-    
-    case '#text':
 
-      break;
+      return false;
+
   };
 };
 
@@ -159,73 +146,101 @@ PlistParser._textValue = function(node) {
   };
 };
 
-// Handle date parsing in non-FF browsers
-// Thanks to http://www.west-wind.com/weblog/posts/729630.aspx
-PlistParser._parseDate = function(date_string){
-  var reISO = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2}(?:\.\d*)?)Z$/;
-  var matched_date = reISO.exec(date_string);
-  if (matched_date){
-    return new Date(Date.UTC(+matched_date[1], +matched_date[2] - 1, +matched_date[3], +matched_date[4], +matched_date[5], +matched_date[6]));
-  };
-};
 
+PlistParser.toPlist = function(obj, formatted) {
 
-// Lifted (then modified) from:
-// http://blog.stchur.com/2007/04/06/serializing-objects-in-javascript/
-PlistParser.serialize = function(_obj) {
-  // Let Gecko browsers do this the easy way
-  try{
-    if (typeof _obj.toSource !== 'undefined' && typeof _obj.callee === 'undefined') {
-      return _obj.toSource();
+  var walkObj = function(target, obj, callback){
+    for(var i in obj){
+      if (obj.hasOwnProperty(i)) {
+          callback(target, i, obj[i]);
+      }
     }
-  } catch(e) {
-    // Keep on truckin'.
   }
 
-  // Other browsers must do it the hard way
-  switch (typeof _obj)
-  {
-    // numbers, booleans, and functions are trivial:
-    // just return the object itself since its default .toString()
-    // gives us exactly what we want
-    case 'number':
-    case 'boolean':
-    case 'function':
-      return _obj;
+  var walkArray = function(target, arr, callback){
+    for (var i=0; i<arr.length; ++i) {
+        callback(target, null, arr[i]);
+    }
+  }
 
-    // for JSON format, strings need to be wrapped in quotes
-    case 'string':
-      return '\'' + _obj + '\'';
+  var isArray = function(o) { 
+      return Object.prototype.toString.call(o) == '[object Array]'; }
 
-    case 'object':
-      var str;
-      if (_obj.constructor === Array || typeof _obj.callee !== 'undefined')
-      {
-        str = '[';
-        var i, len = _obj.length;
-        for (i = 0; i < len-1; i++) { str += PlistParser.serialize(_obj[i]) + ','; }
-        str += PlistParser.serialize(_obj[i]) + ']';
-      }
-      else
-      {
-        str = '{';
-        var key;
-        for (key in _obj) {
-          // "The body of a for in should be wrapped in an if statement to filter unwanted properties from the prototype."
-          if (_obj.hasOwnProperty(key)) {
-            str += key + ':' + PlistParser.serialize(_obj[key]) + ',';
-          };
-        };
-        str = str.replace(/\,$/, '') + '}';
-      }
-      return str;
+  var isInt = function(n) {
+     return n % 1 === 0;
+  }
 
-    default:
-      return 'UNKNOWN';
+  var processObject = function(target, name, value) {
+    if (name) {
+        var key = document.createElement('key');
+        key.innerHTML = name;
+        target.appendChild(key);
+    }
+    if (isArray(value)) {
+        var arr = document.createElement('array');
+        walkArray(arr, value, processObject);
+        target.appendChild(arr);
+    } else if (typeof value == 'object') {
+        if (value instanceof Date) {
+            var date = document.createElement('date');
+            date.innerHTML = value.toISOString().slice(0, 19) + 'Z';
+            target.appendChild(date);
+        } else {
+            var dict = document.createElement('dict');
+            walkObj(dict, value, processObject);
+            target.appendChild(dict);
+        }
+    } else if (typeof value == 'boolean') {
+        var bool = document.createElement(value.toString());
+        target.appendChild(bool);
+    } else if (typeof value == 'number') {
+        if (isInt(value)) {
+            var num = document.createElement('integer');
+        } else {
+            var num = document.createElement('real');
+        }
+        num.innerHTML = value;
+        target.appendChild(num);
+    } else {
+        var string = document.createElement('string');
+        string.textContent = value;
+        target.appendChild(string);
+    }
   };
-};
+  
+  var formatXml = function(xml) {
+    // credit to https://gist.github.com/kurtsson/3f1c8efc0ccd549c9e31
+    var formatted = '';
+    var reg = /(>)(<)(\/*)/g;
+    xml = xml.toString().replace(reg, '$1\r\n$2$3');
+    var pad = 0;
+    var nodes = xml.split('\r\n');
+    for(var n in nodes) {
+      var node = nodes[n];
+      var indent = 0;
+      if (node.match(/.+<\/\w[^>]*>$/)) {
+        indent = 0;
+      } else if (node.match(/^<\/\w/)) {
+        if (pad !== 0) {
+          pad -= 1;
+        }
+      } else if (node.match(/^<\w[^>]*[^\/]>.*$/)) {
+        indent = 1;
+      } else {
+        indent = 0;
+      }
 
-PlistParser.toPlist = function(obj){
+      var padding = '';
+      for (var i = 0; i < pad; i++) {
+        padding += '  ';
+      }
+
+      formatted += padding + node + '\r\n';
+      pad += indent;
+    }
+    return formatted;
+  };
+ 
   var xml = '<?xml version="1.0" encoding="UTF-8"?>';
   xml += '<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">';
 
@@ -233,50 +248,33 @@ PlistParser.toPlist = function(obj){
   var plist = document.createElement('plist');
   plist.setAttribute('version','1.0');
   container.appendChild(plist);
+
+  if (isArray(obj)) {
+      var root = document.createElement('array');
+      plist.appendChild(root);
+      walkArray(root, obj, processObject);
+  } else {
+      var root = document.createElement('dict');
+      plist.appendChild(root);
+      walkObj(root, obj, processObject);
+  }
   
-  var root = document.createElement('dict');
-  plist.appendChild(root);
-
-  var getISOString = function(date){
-    function pad(n) { return n < 10 ? '0' + n : n }
-    return date.getUTCFullYear() + '-'
-      + pad(date.getUTCMonth() + 1) + '-'
-      + pad(date.getUTCDate()) + 'T'
-      + pad(date.getUTCHours()) + ':'
-      + pad(date.getUTCMinutes()) + ':'
-      + pad(date.getUTCSeconds()) + 'Z';
+  var plist = container.innerHTML;
+  // collapse the boolean values to something more commonly seen
+  // we could collapse empty arrays and dicts, too, but I don't want to
+  // since the 'expanded' version is more convenient to work with in
+  // a text editor
+  plist = plist.split('<true></true>').join('<true/>');
+  plist = plist.split('<false></false>').join('<false/>');
+  
+  if (formatted) {
+      // temporarily collapse empty strings so the formatting code doesn't
+      // split the tags across lines
+      plist = plist.split('<string></string>').join('<string/>');
+      formatted_xml = formatXml(xml + plist);
+      //re-expand the empty string tags
+      formatted_xml = formatted_xml.split('<string/>').join('<string></string>');
+      return formatted_xml;
   }
-
-  var walkObj = function(target, obj, callback){
-    for(var i in obj){
-      callback(target, i, obj[i]);
-    }
-  }
-
-  var processObject = function(target, name, value){
-    var key = document.createElement('key');
-    key.innerHTML = name;
-    target.appendChild(key);
-    if(typeof value == 'object'){
-      if(value instanceof Date){
-        var date = document.createElement('date');
-        date.innerHTML = getISOString(value);
-        target.appendChild(date);
-      }else{
-        var dict = document.createElement('dict');
-        walkObj(dict, value, processObject)
-        target.appendChild(dict);
-      }
-    }else if(typeof value == 'boolean'){
-      var bool = document.createElement(value.toString());
-      target.appendChild(bool);
-    }else{
-      var string = document.createElement('string');
-      string.innerHTML = value;
-      target.appendChild(string);
-    }
-  };
-  walkObj(root, obj, processObject);
-
-  return xml+container.innerHTML;
+  return xml + plist;
 };
