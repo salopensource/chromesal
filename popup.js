@@ -169,6 +169,7 @@ function addManagedInstalls(report, appInventory){
       dict.display_name = extension.display_name;
       dict.installed = true;
       dict.installed_version = extension.version;
+      dict.installed_size = 0;
       root.push(dict);
     }
   });
