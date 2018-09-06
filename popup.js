@@ -34,17 +34,14 @@ function sendBackDeviceName(devices){
 
 function populateDevices() {
   // Get the list of devices and display it.
-  // try {
-  //   // Oh why is this only avaialble when running Dev??
-  //   chrome.signedInDevices.get(true, sendBackDeviceName);
-  // }
-  // catch(err) {
-  //   callbackCount++;
-  //   data.name = 'Chrome OS Device';
-  // }
-
-  callbackCount++;
-  data.name = 'Chrome OS Device';
+  try {
+    // Oh why is this only avaialble when running Dev??
+    chrome.signedInDevices.get(true, sendBackDeviceName);
+  }
+  catch(err) {
+    callbackCount++;
+    data.name = 'Chrome OS Device';
+  }
 
 }
 
