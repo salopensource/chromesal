@@ -1,8 +1,8 @@
 /**
  * The meat of ChromeSal.
  **/
- 
- 
+
+
 // Set up some globals
 var debug = false;
 var data = {};
@@ -34,15 +34,18 @@ function sendBackDeviceName(devices){
 
 function populateDevices() {
   // Get the list of devices and display it.
-  try {
-    // Oh why is this only avaialble when running Dev??
-    chrome.signedInDevices.get(true, sendBackDeviceName);
-  }
-  catch(err) {
-    callbackCount++;
-    data.name = 'Chrome OS Device';
-  }
-  
+  // try {
+  //   // Oh why is this only avaialble when running Dev??
+  //   chrome.signedInDevices.get(true, sendBackDeviceName);
+  // }
+  // catch(err) {
+  //   callbackCount++;
+  //   data.name = 'Chrome OS Device';
+  // }
+
+  callbackCount++;
+  data.name = 'Chrome OS Device';
+
 }
 
 function getCPUInfo() {
@@ -153,11 +156,11 @@ function buildInventoryPlist(appInventory){
 
     root.push(dict)
   });
-  
-  
+
+
   return PlistParser.toPlist(root);
-  
-  
+
+
 }
 
 function addManagedInstalls(report, appInventory){
@@ -183,23 +186,23 @@ function checkForData(){
   if (data.key === '') {
     return false;
   }
-  
+
   if (data.serial === '') {
     return false;
   }
-  
+
   if (serverURL === '') {
     return false;
   }
-  
+
   if (data.sal_version === '') {
     return false;
   }
-  
+
   if (data.sal_version === null) {
     return false;
   }
-  
+
   if (settingsSet == false){
     return false
   }
@@ -207,7 +210,7 @@ function checkForData(){
 
 function sendData(){
   report.os_family = 'ChromeOS';
-  
+
   report = addManagedInstalls(report, appInventory);
   var reportPlist = PlistParser.toPlist(report);
   console.log(reportPlist);
@@ -293,7 +296,7 @@ async function getDeviceSerial() {
         console.log(err);
       }
       if (debug === false) {
-        console.log('setting do not send to trye due to no serial error and not being debug')
+        console.log('setting do not send to true due to no serial error and not being debug')
         doNotSend = true;
       }
     }
@@ -321,13 +324,13 @@ function getExtensionVersion() {
         console.log(e);
     });
   });
-  
+
 }
 
 function getExtensions() {
     chrome.management.getAll(function(info){
     // Extensions
-    
+
     info.forEach( function(extension){
       // console.logxr(extension)
       var inventory_item = {};
@@ -338,7 +341,7 @@ function getExtensions() {
       inventory_item.description = extension.description;
       appInventory.push(inventory_item)
     });
-    
+
     callbackCount++;
     console.log('Extension list callback');
     });
@@ -368,7 +371,7 @@ function getSettings(){
     });
   });
   chrome.storage.managed.get(null, function(adminConfig) {
-    
+
     //console.log("chrome.storage.managed.get adminConfig: ", adminConfig);
     data.key = adminConfig['key'];
     serverURL = adminConfig['serverurl'];
@@ -376,8 +379,8 @@ function getSettings(){
     callbackCount++;
   });
   // console.log(data.key);
-  
-  
+
+
 }
 
 function notRunningMessage() {
@@ -389,7 +392,7 @@ function notRunningMessage() {
 }
 
 function main() {
-  
+
   getSettings();
   waitForSettings(function() {
     guid();
@@ -401,12 +404,12 @@ function main() {
     getOsVersion();
     getMemInfo();
     getExtensions();
-    
+
     continueExec();
   });
-  
+
 }
-  
+
 document.addEventListener('DOMContentLoaded', function() {
   main()
 });
