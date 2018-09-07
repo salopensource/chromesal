@@ -162,6 +162,9 @@ function buildInventoryPlist(appInventory){
 
 function addManagedInstalls(report, appInventory){
   var root = [];
+  if (report.hasOwnProperty('ManagedInstalls')) {
+    return report;
+  }
   appInventory.forEach( function(extension){
     if (extension.install_type == 'admin') {
       var dict = {}
