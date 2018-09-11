@@ -27,16 +27,19 @@ function renderStatus(statusText) {
   }
 }
 
-function sendBackDeviceName(devices){
+function sendBackDeviceName(device_name){
   callbackCount++;
-  data.name = devices[0].name;
+  if (device_name) {
+    data.name = device_name;
+  } else {
+    data.name = 'Chrome OS Device';
+  }
+  
 }
 
-function populateDevices() {
-  // Get the list of devices and display it.
+function getDeviceName() {
   try {
-    // Oh why is this only avaialble when running Dev??
-    chrome.signedInDevices.get(true, sendBackDeviceName);
+    chrome.enterprise.deviceAttributes.getDeviceSerialNumber(sendBackDeviceName);
   }
   catch(err) {
     callbackCount++;
@@ -415,18 +418,18 @@ function main() {
 
   getSettings();
   waitForSettings(function() {
-    guid();
-    getExtensionVersion();
-    getDeviceSerial();
-    populateDevices();
-    getCPUInfo();
-    getStorageInfo();
-    getOsVersion();
-    getMemInfo();
-    getExtensions();
-    getConsoleUser();
+  guid();
+  getExtensionVersion();
+  getDeviceSerial();
+  getDeviceName();
+  getCPUInfo();
+  getStorageInfo();
+  getOsVersion();
+  getMemInfo();
+  getExtensions();
+  getConsoleUser();
 
-    continueExec();
+  continueExec();
   });
 
 }

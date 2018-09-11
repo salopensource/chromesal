@@ -2,7 +2,7 @@
   "manifest_version": 2,
   "name": "ChromeSal",
   "description": "This extension allows ChromeOS devices to report to Sal. This extension must be installed on a managed device to function.",
-  "version": "1.0.1.3",
+  "version": "1.0.1.4",
   "browser_action": {
     "default_icon": "icons/active_128.png",
     "default_popup": "popup.html"
@@ -11,6 +11,11 @@
     "persistent": true,
     "scripts": ["plist_parser.js", "jquery.js", "popup.js", "background.js"]
   },
+  "icons": {
+    "16": "icons/active_16.png",
+    "48": "icons/active_48.png",
+    "128": "icons/active_128.png"
+  },
 
   "short_name": "ChromeSal",
   "permissions": [
@@ -18,7 +23,6 @@
     "system.cpu",
     "https://*/*",
     "http://*/*",
-    "signedInDevices",
     "system.storage",
     "management",
     "storage",
@@ -30,5 +34,5 @@
   "storage": {
     "managed_schema": "schema.json"
   },
-  "minimum_chrome_version": "46"
+  "minimum_chrome_version": "66"
 }
