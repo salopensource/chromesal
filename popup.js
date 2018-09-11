@@ -11,7 +11,7 @@ var report = {};
 report.MachineInfo = {};
 report.MachineInfo.HardwareInfo = {};
 var callbackCount = 0;
-var callbackTotal = 9;
+var callbackTotal = 10;
 var doNotSend = false;
 var appInventory = [];
 var settingsSet = false;
@@ -43,6 +43,14 @@ function populateDevices() {
     data.name = 'Chrome OS Device';
   }
 
+}
+
+function getConsoleUser(){
+  chrome.identity.getProfileUserInfo(function(info){
+    data.username = info.email;
+    // console.log(info);
+  })
+  callbackCount++;
 }
 
 function getCPUInfo() {
@@ -142,7 +150,6 @@ async function continueExec() {
 
 function buildInventoryPlist(appInventory){
   root = []
-
   appInventory.forEach( function(extension){
 
     dict = {}
@@ -153,6 +160,8 @@ function buildInventoryPlist(appInventory){
 
     root.push(dict)
   });
+
+  root = removeDuplicates(root, 'bundleid')
 
 
   return PlistParser.toPlist(root);
@@ -177,7 +186,7 @@ function addManagedInstalls(report, appInventory){
     }
   });
 
-  console.log(root);
+  // console.log(root);
   report.ManagedInstalls = root;
   return report;
 }
@@ -213,7 +222,7 @@ function sendData(){
 
   report = addManagedInstalls(report, appInventory);
   var reportPlist = PlistParser.toPlist(report);
-  console.log(reportPlist);
+  // console.log(reportPlist);
   // console.log(data);
   data.base64report = btoa(reportPlist);
   // console.log(data)
@@ -327,20 +336,32 @@ function getExtensionVersion() {
 
 }
 
+function removeDuplicates( arr, prop ) {
+  let obj = {};
+  return Object.keys(arr.reduce((prev, next) => {
+    if(!obj[next[prop]]) obj[next[prop]] = next; 
+    return obj;
+  }, obj)).map((i) => obj[i]);
+}
+
 function getExtensions() {
     chrome.management.getAll(function(info){
     // Extensions
 
-    info.forEach( function(extension){
-      // console.logxr(extension)
-      var inventory_item = {};
-      inventory_item.name = extension.name;
-      inventory_item.bundleid = extension.id;
-      inventory_item.version= extension.version;
-      inventory_item.install_type = extension.installType;
-      inventory_item.description = extension.description;
-      appInventory.push(inventory_item)
-    });
+    if (appInventory != []) {
+
+      info.forEach( function(extension){
+        // console.logxr(extension)
+        var inventory_item = {};
+        inventory_item.name = extension.name;
+        inventory_item.bundleid = extension.id;
+        inventory_item.version= extension.version;
+        inventory_item.install_type = extension.installType;
+        inventory_item.description = extension.description;
+        appInventory.push(inventory_item)
+      });
+
+    }
 
     callbackCount++;
     console.log('Extension list callback');
@@ -404,6 +425,7 @@ function main() {
     getOsVersion();
     getMemInfo();
     getExtensions();
+    getConsoleUser();
 
     continueExec();
   });
