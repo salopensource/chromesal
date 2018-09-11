@@ -222,9 +222,13 @@ function sendData(){
 
   report = addManagedInstalls(report, appInventory);
   var reportPlist = PlistParser.toPlist(report);
+  var inventoryPlist = buildInventoryPlist(appInventory);
   // console.log(reportPlist);
   // console.log(data);
   data.base64report = btoa(reportPlist);
+  data.base64inventory = btoa(unescape(encodeURIComponent(inventoryPlist)));
+  // console.log(inventoryPlist)
+  // console.log(buildInventoryPlist(appInventory));
   // console.log(data)
   if (debug===true){
     console.log(data);
@@ -239,12 +243,6 @@ function sendData(){
       },
       success: function(received) {
           console.log(received);
-          var inventoryPlist = buildInventoryPlist(appInventory);
-          console.log(inventoryPlist)
-          // console.log(buildInventoryPlist(appInventory));
-          // console.log(inventoryPlist);
-          data.base64inventory = btoa(unescape(encodeURIComponent(inventoryPlist)));
-          // console.log(data);
           jQuery.ajax({
               type: "POST",
               url: serverURL + '/inventory/submit/',
@@ -256,7 +254,7 @@ function sendData(){
                   console.log(received);
               },
               error: function(received) {
-                  // console.log(received.responseText);
+                  console.log(received.responseText);
               }
           });
       },
@@ -339,7 +337,7 @@ function getExtensionVersion() {
 function removeDuplicates( arr, prop ) {
   let obj = {};
   return Object.keys(arr.reduce((prev, next) => {
-    if(!obj[next[prop]]) obj[next[prop]] = next; 
+    if(!obj[next[prop]]) obj[next[prop]] = next;
     return obj;
   }, obj)).map((i) => obj[i]);
 }
