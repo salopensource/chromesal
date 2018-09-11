@@ -1,4 +1,4 @@
-var min=20;
+var min=5;
 var max=30;
 var alarmPeriod = Math.floor(Math.random() * (+max - +min)) + +min;
 

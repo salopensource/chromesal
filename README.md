@@ -2,6 +2,8 @@
 
 ChromeSal is an extension for Chrome OS that allows Managed Chrome devices to report to a Sal server.
 
+The built extension can be found on the [Chrome Web Store](https://chrome.google.com/webstore/detail/ohnahlfkoiaeknjhhcnhcjgpemccoklg/).
+
 ## Requirements
 
 * The Chrome OS device _must_ be enterprise enrolled.
