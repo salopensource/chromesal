@@ -149,7 +149,7 @@ async function continueExec() {
 }
 
 function buildInventoryPlist(appInventory){
-  root = []
+  var plistroot = []
   appInventory.forEach( function(extension){
 
     dict = {}
@@ -158,14 +158,13 @@ function buildInventoryPlist(appInventory){
     dict.CFBundleName = extension.name;
     dict.name = extension.name;
 
-    root.push(dict)
+    plistroot.push(dict)
   });
 
-  root = removeDuplicates(root, 'bundleid')
+  plistroot = removeDuplicates(plistroot, 'bundleid')
 
 
-  return PlistParser.toPlist(root);
-
+  return PlistParser.toPlist(plistroot);
 
 }
 

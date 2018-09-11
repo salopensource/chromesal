@@ -1,8 +1,8 @@
-alarmPeriod = Math.floor(Math.random() * 29);
+// alarmPeriod = Math.floor(Math.random() * 29);
 
 chrome.alarms.create('salAlarm', {
     delayInMinutes: 1,
-    periodInMinutes: alarmPeriod
+    periodInMinutes: 30
 });
 
 chrome.alarms.onAlarm.addListener(function(alarm) {
