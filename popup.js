@@ -237,8 +237,8 @@ function sendData(){
       type: "POST",
       url: serverURL + '/checkin/',
       data: data,
-            beforeSend: function (xhr) {
-          xhr.setRequestHeader ("Authorization", "Basic " + btoa("sal:" + data.key));
+      beforeSend: function (xhr) {
+        xhr.setRequestHeader ("Authorization", "Basic " + btoa("sal:" + data.key));
       },
       success: function(received) {
           console.log(received);
@@ -246,15 +246,17 @@ function sendData(){
               type: "POST",
               url: serverURL + '/inventory/submit/',
               data: data,
-                    beforeSend: function (xhr) {
-                  xhr.setRequestHeader ("Authorization", "Basic " + btoa("sal:" + data.key));
+              beforeSend: function (xhr) {
+                xhr.setRequestHeader ("Authorization", "Basic " + btoa("sal:" + data.key));
               },
               success: function(received) {
-                  console.log(received);
+                console.log(received);
               },
               error: function(received) {
-                  console.log(received.responseText);
-              }
+                console.log(received.responseText);
+                console.log('Auth: ' + btoa("sal:" + data.key));
+                console.log(data);
+              },
           });
       },
       error: function(received) {

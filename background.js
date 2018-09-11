@@ -9,8 +9,6 @@ chrome.alarms.create('salAlarm', {
 
 chrome.alarms.onAlarm.addListener(function(alarm) {
     if (alarm.name === 'salAlarm') {
-        console.log('alarm!')
-        console.log(alarmPeriod)
        main();
     }
 });
