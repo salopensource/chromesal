@@ -46,4 +46,5 @@ If you wish to test on a non-enterprise enrolled / non-chrome OS device, set `de
 
 ## Credits
 https://github.com/pugetive/plist_parser
-Icon: Monitor by Astonish from the Noun Project
+
+Icon: Monitor by Astonish from the [Noun Project](https://thenounproject.com)
