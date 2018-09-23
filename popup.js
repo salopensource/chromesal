@@ -243,13 +243,6 @@ function s4() {
   }
 }
 
-
-async function continueExec() {
-  // checkForData
-  // sendData
-
-}
-
 function buildInventoryPlist(appInventory) {
   var plistroot = []
   appInventory.forEach(function (extension) {
@@ -270,27 +263,37 @@ function buildInventoryPlist(appInventory) {
 
 }
 
-function addManagedInstalls(report, appInventory) {
-  var root = [];
-  if (report.hasOwnProperty('ManagedInstalls')) {
-    return report;
-  }
-  appInventory.forEach(function (extension) {
-    if (extension.install_type == 'admin') {
-      var dict = {}
-      dict.name = extension.name;
-      dict.display_name = extension.display_name;
-      dict.installed = true;
-      dict.installed_version = extension.version;
-      dict.installed_size = 0;
-      root.push(dict);
-    }
-  });
-
-  // console.log(root);
-  report.ManagedInstalls = root;
-  return report;
+/**
+ * Predicate used to filter out admin forced extensions.
+ * 
+ * @param {Object} extension An installed chrome extension
+ */
+function isManagedInstall(extension) {
+  return extension.install_type == 'admin';
 }
+
+
+// function addManagedInstalls(report, appInventory) {
+//   var root = [];
+//   if (report.hasOwnProperty('ManagedInstalls')) {
+//     return report;
+//   }
+//   appInventory.forEach(function (extension) {
+//     if (extension.install_type == 'admin') {
+//       var dict = {}
+//       dict.name = extension.name;
+//       dict.display_name = extension.display_name;
+//       dict.installed = true;
+//       dict.installed_version = extension.version;
+//       dict.installed_size = 0;
+//       root.push(dict);
+//     }
+//   });
+
+//   // console.log(root);
+//   report.ManagedInstalls = root;
+//   return report;
+// }
 
 /**
  * Submit a Check-in
@@ -375,10 +378,6 @@ function getExtensionVersion() {
           reader.addEventListener("load", function (event) {
             var manifest = JSON.parse(reader.result);
             resolve(manifest);
-            // data.sal_version =  manifest.version;
-            // if (doNotSend == false){
-            //   renderStatus('Running chromesal ' +data.sal_version);
-            // }
           });
           reader.readAsText(file);
         });
@@ -389,37 +388,6 @@ function getExtensionVersion() {
   });
 }
 
-function removeDuplicates(arr, prop) {
-  let obj = {};
-  return Object.keys(arr.reduce((prev, next) => {
-    if (!obj[next[prop]]) obj[next[prop]] = next;
-    return obj;
-  }, obj)).map((i) => obj[i]);
-}
-
-// function getExtensions() {
-//     chrome.management.getAll(function(info){
-//     // Extensions
-
-//     if (appInventory != []) {
-
-//       info.forEach( function(extension){
-//         // console.logxr(extension)
-//         var inventory_item = {};
-//         inventory_item.name = extension.name;
-//         inventory_item.bundleid = extension.id;
-//         inventory_item.version= extension.version;
-//         inventory_item.install_type = extension.installType;
-//         inventory_item.description = extension.description;
-//         appInventory.push(inventory_item)
-//       });
-
-//     }
-
-//     callbackCount++;
-//     console.log('Extension list callback');
-//     });
-// }
 
 /**
  * Read settings from local file, fall back to managed settings.
@@ -457,15 +425,6 @@ function getManagedSettings() {
     }
   });
 }
-
-
-// function notRunningMessage() {
-//   console.log('Not running on a managed device, not sending report');
-//   renderStatus('Only functional on a managed Chrome OS device');
-//   chrome.browserAction.setIcon({
-//     path : "./icons/inactive_128.png"
-//   });
-// }
 
 /**
  * Collect all information for submission.
@@ -543,11 +502,28 @@ function createCheckInData(results) {
  * @param {Array} results Array of promise resolutions from collect()
  */
 function createReport(results) {
-  let memoryTotalGB = formatMemoryInfo(results[4]);
+  let deviceSerial = results[0];
+  let deviceName = results[1];
+  let cpuInfo = results[2];
+  let storageInfo = results[3];
+  let memoryInfo = results[4];
+  let extensions = results[5];
+  let userInfo = results[6];
+  let manifest = results[7];
+
+  let memoryTotalGB = formatMemoryInfo(memoryInfo);
 
   var report = {
+    os_family: "ChromeOS",
+    AvailableDiskSpace: storageInfo.length > 0 ? storageInfo[0].capacity : null,
+    ManagedInstalls: extensions.filter(isManagedInstall),
     MachineInfo: {
-      HardwareInfo: {}
+      os_vers: "UNKNOWN",
+      HardwareInfo: {
+        cpu_type: null,
+        current_processor_speed: null,
+        physical_memory: memoryTotalGB,
+      }
     }
   };
 
@@ -556,11 +532,11 @@ function createReport(results) {
 
 function main() {
 
-  getSettings().then(function (settings) {
-    return collect(settings);
-  }).then(function (collection) {
+  getSettings().then(collect).then(function (collection) {
     console.log(collection);
     return checkIn(collection[0], collection[2]);
+  }).then(function (checkinResponse) {
+    
   }).catch(function (err) {
     console.log(err);
   })
