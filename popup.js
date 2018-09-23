@@ -230,14 +230,17 @@ function getOsVersion() {
 
 
 function guid() {
-  data.run_uuid = s4() + s4() + '-' + s4() + '-' + s4() + '-' +
+  return s4() + s4() + '-' + s4() + '-' + s4() + '-' +
     s4() + '-' + s4() + s4() + s4();
 }
 
 function s4() {
-  return Math.floor((1 + Math.random()) * 0x10000)
-    .toString(16)
-    .substring(1);
+  let s = Math.floor(Math.random() * (16 << 12)).toString(16);
+  if (s.length == 3) { 
+    return "0" + s; 
+  } else {
+    return s;
+  }
 }
 
 
@@ -289,6 +292,51 @@ function addManagedInstalls(report, appInventory) {
   return report;
 }
 
+/**
+ * Submit a Check-in
+ * 
+ * @param {Object} checkinData Object literal containing check in data to be submitted as JSON.
+ * @param {Object} settings Object literal containing the extension settings.
+ * @returns {Promise} A promise that resolves with the json response.
+ */
+function checkIn(checkinData, settings) {
+  const checkInURL = settings.checkInURL || settings.serverurl + '/checkin/';
+
+  return fetch(checkInURL, {
+    method: 'post',
+    headers: {
+      "Authorization": "Basic " + btoa("sal:" + settings.key),
+      "Content-Type": "application/json;charset=utf-8",
+      "Accept": "application/json;charset=utf-8",
+    },
+    body: JSON.stringify(checkinData)
+  }).then(function (data) {
+    return data.json();
+  });
+}
+
+/**
+ * Submit Full Inventory Data.
+ * 
+ * @param {Object} inventoryData Inventory data
+ * @param {Object} settings Object literal containing the extension settings.
+ * @returns {Promise} A promise that resolves with the json response.
+ */
+function submitInventory(inventoryData, settings) {
+  const submitURL = settings.submitURL || settings.serverurl + '/inventory/submit/';
+
+  return fetch(submitURL, {
+    method: 'post',
+    headers: {
+      "Authorization": "Basic " + btoa("sal:" + data.key),
+      "Content-Type": "application/json;charset=utf-8",
+      "Accept": "application/json;charset=utf-8",
+    },
+    body: JSON.stringify(inventoryData)
+  }).then(function (data) {
+    return data.json();
+  })
+}
 
 function sendData() {
   report.os_family = 'ChromeOS';
@@ -308,29 +356,7 @@ function sendData() {
   }
   // console.log(buildInventoryPlist(appInventory));
 
-  fetch(serverURL + '/checkin/', {
-    method: 'post',
-    headers: {
-      "Authorization": "Basic " + btoa("sal:" + data.key)
-    },
-    body: data
-  }).then(function (data) {
-    return data.json();
-  }).then(function (received) {
-    return fetch(serverURL + '/inventory/submit/', {
-      method: 'post',
-      headers: {
-        "Authorization": "Basic " + btoa("sal:" + data.key)
-      },
-      body: data
-    })
-  }).then(function (data) {
-    return data.json();
-  }).then(function (received) {
-    console.log(received);
-  }).catch(function (error) {
-    console.log(error);
-  });
+  
 }
 
 /**
@@ -407,13 +433,8 @@ function getSettings() {
         fileEntry.file(function (file) {
           var reader = new FileReader()
           reader.addEventListener("load", function (event) {
-            // data now in reader.result
             var settings = JSON.parse(reader.result);
             console.log('Using local settings file');
-            console.log(settings.debug);
-            // data.key = settings.key;
-            // serverURL = settings.serverurl;
-            // debug = settings.debug;
             resolve(settings);
           });
           reader.readAsText(file);
@@ -458,14 +479,15 @@ function collect(settings) {
     throw new TypeError("Settings does not contain a `serverurl` key. We cannot submit data to a server.");
   }
 
-  Promise.all([
+  return Promise.all([
     getDirectoryId(),
     getDeviceName(),
     getCPUInfo(),
     getStorageInfo(),
     getMemoryInformation(),
     getInstalledExtensions(),
-    getUserInfo()
+    getUserInfo(),
+    getExtensionVersion(),
   ]).then(function (results) {
     let deviceSerial = results[0];
     let deviceName = results[1];
@@ -474,8 +496,14 @@ function collect(settings) {
     let memoryInfo = results[4];
     let extensions = results[5];
     let userInfo = results[6];
+    let manifest = results[7];
 
     console.dir(results);
+
+    let report = createReport(results);
+    let checkinData = createCheckInData(results);
+
+    return [checkinData, report, settings];
   });
 }
 
@@ -486,8 +514,15 @@ function collect(settings) {
  */
 function createCheckInData(results) {
   var data = {
-    username: results[6].email
+    name: results[1] ? results[1] : "Chrome OS Device",
+    username: results[6].email,
+    run_uuid: guid(),
+    key: 'key',
+    sal_version: results[7].version,
+    serial: results[0] ? results[0].toUpperCase() : 'ABC123',
   }
+
+  console.log(data);
 
   return data;
 }
@@ -516,18 +551,16 @@ function createReport(results) {
     }
   };
 
-
+  return report;
 }
 
 function main() {
 
   getSettings().then(function (settings) {
     return collect(settings);
-  }).catch(function (err) {
-    console.log(err);
-    // return getManagedSettings().then(function (managedSettings) {
-    //   return collect(managedSettings);
-    // });
+  }).then(function (collection) {
+    console.log(collection);
+    return checkIn(collection[0], collection[2]);
   }).catch(function (err) {
     console.log(err);
   })
