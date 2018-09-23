@@ -2,112 +2,234 @@
  * The meat of ChromeSal.
  **/
 
-
-// Set up some globals
-var debug = false;
-var data = {};
-data.sal_version = '';
-var report = {};
-report.MachineInfo = {};
-report.MachineInfo.HardwareInfo = {};
-var callbackCount = 0;
-var callbackTotal = 10;
-var doNotSend = false;
-var appInventory = [];
-var settingsSet = false;
-
-var key = '';
-var serverURL = '';
-
 function renderStatus(statusText) {
   try {
     document.getElementById('status').textContent = statusText;
-  } catch(err) {
+  } catch (err) {
     console.log(statusText);
   }
 }
 
-function sendBackDeviceName(device_name){
-  callbackCount++;
-  if (device_name) {
-    data.name = device_name;
-  } else {
-    data.name = 'Chrome OS Device';
-  }
-  
+
+/**
+ * Get the directory Id for this device (if available).
+ *
+ * @see https://developer.chrome.com/extensions/enterprise_deviceAttributes#method-getDirectoryDeviceId
+ * @returns {Promise}
+ */
+function getDirectoryId() {
+  return new Promise(function (resolve, reject) {
+    if (chrome.enterprise) {
+      chrome.enterprise.deviceAttributes.getDirectoryDeviceId(function callback(deviceId) {
+        resolve(deviceId);
+      });
+    } else {
+      resolve(null);
+    }
+  });
 }
 
+/**
+ * Get all installed extensions for this user account.
+ * 
+ * @see https://developer.chrome.com/extensions/management#method-getAll
+ * @returns {Promise}
+ */
+function getInstalledExtensions() {
+  return new Promise(function (resolve, reject) {
+    try {
+      chrome.management.getAll(function (extensions) {
+        resolve(extensions);
+      });
+    } catch (err) {
+      reject(err);
+    }
+  });
+}
+
+/**
+ * Prepare installed extensions into desired submission format.
+ * 
+ * @param {Array} extensions Array of extensions
+ * 
+ */
+function prepareExtensions(extensions) {
+  // extensions.forEach(function(extension) {
+
+  // })
+
+  //     if (appInventory != []) {
+
+  //       info.forEach( function(extension){
+  //         // console.logxr(extension)
+  //         var inventory_item = {};
+  //         inventory_item.name = extension.name;
+  //         inventory_item.bundleid = extension.id;
+  //         inventory_item.version= extension.version;
+  //         inventory_item.install_type = extension.installType;
+  //         inventory_item.description = extension.description;
+  //         appInventory.push(inventory_item)
+  //       });
+}
+
+/**
+ * Get information about the platform runtime.
+ * 
+ * @see https://developers.chrome.com/extensions/runtime#method-getPlatformInfo
+ * @see https://developers.chrome.com/extensions/runtime#type-PlatformInfo
+ * @returns {Promise}
+ */
+function getRuntimeInformation() {
+  return new Promise(function (resolve, reject) {
+    chrome.runtime.getPlatformInfo(function (platformInfo) {
+      resolve(platformInfo);
+    });
+  });
+}
+
+/**
+ * Get information about system memory.
+ * 
+ * @see https://developer.chrome.com/apps/system_memory#method-getInfo
+ * @returns {Promise}
+ */
+function getMemoryInformation() {
+  return new Promise(function (resolve, reject) {
+    chrome.system.memory.getInfo(function (info) {
+      resolve(info);
+    });
+  });
+}
+
+/**
+ * Format memory information.
+ * 
+ * @param {MemoryInformation} info 
+ * @returns {String} Formatted memory in gigabytes eg. "2 GB"
+ */
+function formatMemoryInfo(info) {
+  return (info.capacity / 1000000000).toFixed(2) + ' GB';
+}
+
+/**
+ * Get information about the current Chrome users' profile.
+ * 
+ * @see https://developer.chrome.com/apps/identity#method-getProfileUserInfo
+ * @returns {Promise}
+ */
+function getUserInfo() {
+  return new Promise(function (resolve, reject) {
+    chrome.identity.getProfileUserInfo(function (info) {
+      resolve(info);
+    });
+  });
+}
+
+/**
+ * Get Chrome device name.
+ * 
+ * @see https://developer.chrome.com/extensions/enterprise_deviceAttributes#method-getDeviceSerialNumber
+ * @returns {Promise}
+ */
 function getDeviceName() {
-  try {
-    chrome.enterprise.deviceAttributes.getDeviceSerialNumber(sendBackDeviceName);
-  }
-  catch(err) {
-    callbackCount++;
-    data.name = 'Chrome OS Device';
-  }
+  return new Promise(function (resolve, reject) {
+    if (!chrome.enterprise) {
+      console.log("Not a ChromeOS Device, Returning NULL for device name.");
+      return resolve(null);
+    }
 
+    try {
+      chrome.enterprise.deviceAttributes.getDeviceSerialNumber(function (deviceName) {
+        resolve(deviceName);
+      });
+    } catch (err) {
+      reject(err);
+    }
+  });
 }
 
-function getConsoleUser(){
-  chrome.identity.getProfileUserInfo(function(info){
-    data.username = info.email;
-    // console.log(info);
-  })
-  callbackCount++;
-}
-
+/**
+ * Get Chrome CPU Info
+ * 
+ * @see https://developer.chrome.com/apps/system_cpu
+ * @returns {Promise}
+ */
 function getCPUInfo() {
-  chrome.system.cpu.getInfo(sendBackCPUInfo);
+  return new Promise(function (resolve, reject) {
+    try {
+      chrome.system.cpu.getInfo(function (cpuInfo) {
+        resolve(cpuInfo);
+      });
+    } catch (err) {
+      reject(err);
+    }
+  });
 }
 
-function sendBackCPUInfo(info) {
+/**
+ * Prepare information about storage for submission.
+ * 
+ * @param {StorageUnitInfo} storageInfo Structure returned by storage.getInfo
+ * 
+ */
+function prepareStorageInfo(storageInfo) {
+  if (storageInfo.length === 0) {
+    data.disk_size = '1';
+  } else {
+    data.disk_size = storageInfo[0].capacity;
+    report.AvailableDiskSpace = storageInfo[0].capacity;
+  }
+}
+
+/**
+ * Get Chrome Storage Information
+ * 
+ * {
+ *  "id": "...",
+ *  "name": "",
+ *  "type": "fixed|removable|unknown",
+ *  "capacity": 12345
+ * }
+ * 
+ * @see https://developer.chrome.com/apps/system_storage#method-getInfo
+ * @see https://developer.chrome.com/apps/system_storage#type-StorageUnitInfo
+ * 
+ * @returns {Promise}
+ */
+function getStorageInfo() {
+  return new Promise(function (resolve, reject) {
+    try {
+      chrome.system.storage.getInfo(function (storageInfo) {
+        resolve(storageInfo);
+      });
+    } catch (err) {
+      reject(err);
+    }
+  });
+}
+
+
+function formatCPUInfo(cpuInfo) {
   // console.log(info);
   var cpu_array = info.modelName.split('@');
   report.MachineInfo.HardwareInfo.cpu_type = cpu_array[0].trim();
-  if (report.MachineInfo.HardwareInfo.cpu_type.endsWith('CPU ')){
+  if (report.MachineInfo.HardwareInfo.cpu_type.endsWith('CPU ')) {
     report.MachineInfo.HardwareInfo.cpu_type = report.MachineInfo.HardwareInfo.cpu_type.slice(0, -4).trim()
   }
   report.MachineInfo.HardwareInfo.current_processor_speed = cpu_array[1].trim();
-  callbackCount++;
 }
 
 function getOsVersion() {
   userAgentString = navigator.userAgent;
-	if (/Chrome/.test(userAgentString)) {
-		report.MachineInfo.os_vers = userAgentString.match('Chrome/([0-9]*\.[0-9]*\.[0-9]*\.[0-9]*)')[1];
+  if (/Chrome/.test(userAgentString)) {
+    report.MachineInfo.os_vers = userAgentString.match('Chrome/([0-9]*\.[0-9]*\.[0-9]*\.[0-9]*)')[1];
   } else {
     report.MachineInfo.os_vers = 'UNKNOWN';
   }
-  callbackCount++;
 }
 
-function sendBackStorageInfo(info) {
-  callbackCount++;
-  // console.log(info);
-  if (info.length === 0) {
-    data.disk_size = '1';
-  } else {
-    data.disk_size = info[0].capacity;
-    report.AvailableDiskSpace = info[0].capacity;
-  }
-}
-
-function getStorageInfo() {
-  chrome.system.storage.getInfo(sendBackStorageInfo);
-}
-
-function getMemInfo() {
-  chrome.system.memory.getInfo(sendBackMem);
-}
-
-function sendBackMem(info) {
-  // console.log(info);
-  report.MachineInfo.HardwareInfo.physical_memory = (info.capacity/1000000000).toFixed(2) + ' GB';
-  callbackCount++;
-}
 
 function guid() {
-  callbackCount++;
   data.run_uuid = s4() + s4() + '-' + s4() + '-' + s4() + '-' +
     s4() + '-' + s4() + s4() + s4();
 }
@@ -118,42 +240,16 @@ function s4() {
     .substring(1);
 }
 
-function waitForSettings() {
-  // Wait for settings to have run before carrying on
-  if (settingsSet !== true) {
-    console.log('Waiting for settings');
-    setTimeout(waitForSettings, 1000);
-  }
-}
-
-
-function waitForSettings(callback) {
-  if (settingsSet === true) {
-    callback && callback();
-  } else {
-    setTimeout(waitForSettings, 1000, callback);
-  }
-}
 
 async function continueExec() {
-  data_check = await checkForData();
-  //here is the trick, wait until var callbackCount is set number of callback functions
-  if (doNotSend === true && debug === false) {
-    notRunningMessage();
-    return;
-  }
-  if (callbackCount < callbackTotal || data_check === false) {
-    console.log('Waiting for data');
-    setTimeout(continueExec, 1000);
-    return;
-  }
-  //Finally, do what you need
-  setTimeout(sendData, 2000);
+  // checkForData
+  // sendData
+
 }
 
-function buildInventoryPlist(appInventory){
+function buildInventoryPlist(appInventory) {
   var plistroot = []
-  appInventory.forEach( function(extension){
+  appInventory.forEach(function (extension) {
 
     dict = {}
     dict.bundleid = extension.bundleid;
@@ -171,12 +267,12 @@ function buildInventoryPlist(appInventory){
 
 }
 
-function addManagedInstalls(report, appInventory){
+function addManagedInstalls(report, appInventory) {
   var root = [];
   if (report.hasOwnProperty('ManagedInstalls')) {
     return report;
   }
-  appInventory.forEach( function(extension){
+  appInventory.forEach(function (extension) {
     if (extension.install_type == 'admin') {
       var dict = {}
       dict.name = extension.name;
@@ -193,33 +289,8 @@ function addManagedInstalls(report, appInventory){
   return report;
 }
 
-function checkForData(){
-  if (data.key === '') {
-    return false;
-  }
 
-  if (data.serial === '') {
-    return false;
-  }
-
-  if (serverURL === '') {
-    return false;
-  }
-
-  if (data.sal_version === '') {
-    return false;
-  }
-
-  if (data.sal_version === null) {
-    return false;
-  }
-
-  if (settingsSet == false){
-    return false
-  }
-}
-
-function sendData(){
+function sendData() {
   report.os_family = 'ChromeOS';
 
   report = addManagedInstalls(report, appInventory);
@@ -232,7 +303,7 @@ function sendData(){
   // console.log(inventoryPlist)
   // console.log(buildInventoryPlist(appInventory));
   // console.log(data)
-  if (debug===true){
+  if (debug === true) {
     console.log(data);
   }
   // console.log(buildInventoryPlist(appInventory));
@@ -262,171 +333,193 @@ function sendData(){
   });
 }
 
-async function getDeviceSerial() {
-  // We are only going to run on a Chrome OS device
-  chrome.runtime.getPlatformInfo(async function(info) {
-    //console.log(info)
-    if (!info.os.toLowerCase().includes('cros')){
-      if (debug === false) {
-        console.log('Not cros and not debug')
-        doNotSend = true;
-      }
-    }
-  });
-  // console.log('Is chrome: '+is_chrome);
-  // if (is_chrome === false) {
-  //   doNotSend = true;
-  //   // notRunnngMessage();
-  // }
-
-  try {
-      chrome.enterprise.deviceAttributes.getDirectoryDeviceId(async deviceId => {
-          // renderStatus(deviceId);
-          // console.log(deviceId);
-          data.serial = deviceId.toUpperCase();
-          if (data.serial === '') {
-            throw 'No Serial returned'
-            if (debug === false) {
-              console.log('setting do not send to true due to no serial being returned and not being debug')
-              doNotSend = true;
-            }
-          }
-      });
-    }
-    catch(err) {
-      data.serial = 'abc123'.toUpperCase();
-      console.log('Not a managed chrome device');
-      if (debug === true){
-        console.log(err);
-      }
-      if (debug === false) {
-        console.log('setting do not send to true due to no serial error and not being debug')
-        doNotSend = true;
-      }
-    }
-    callbackCount++;
-}
-
+/**
+ * Get information about the ChromeSal Extension.
+ * 
+ * Mainly used to determine the current version of the extension.
+ * 
+ * @returns {Promise}
+ */
 function getExtensionVersion() {
-  callbackCount++;
-  chrome.runtime.getPackageDirectoryEntry(function (dirEntry) {
-    dirEntry.getFile("manifest.json", undefined, function (fileEntry) {
-    fileEntry.file(function (file) {
-            var reader = new FileReader()
-            reader.addEventListener("load", function (event) {
-                // data now in reader.result
-                // console.log(reader.result);
-                var manifest = JSON.parse(reader.result);
-                data.sal_version =  manifest.version;
-                if (doNotSend == false){
-                  renderStatus('Running chromesal ' +data.sal_version);
-                }
-            });
-            reader.readAsText(file);
+  return new Promise(function (resolve, reject) {
+    chrome.runtime.getPackageDirectoryEntry(function (dirEntry) {
+      dirEntry.getFile("manifest.json", undefined, function (fileEntry) {
+        fileEntry.file(function (file) {
+          var reader = new FileReader()
+          reader.addEventListener("load", function (event) {
+            var manifest = JSON.parse(reader.result);
+            resolve(manifest);
+            // data.sal_version =  manifest.version;
+            // if (doNotSend == false){
+            //   renderStatus('Running chromesal ' +data.sal_version);
+            // }
+          });
+          reader.readAsText(file);
         });
-    }, function (e) {
-        console.log(e);
+      }, function (e) {
+        reject(e);
+      });
     });
   });
-
 }
 
-function removeDuplicates( arr, prop ) {
+function removeDuplicates(arr, prop) {
   let obj = {};
   return Object.keys(arr.reduce((prev, next) => {
-    if(!obj[next[prop]]) obj[next[prop]] = next;
+    if (!obj[next[prop]]) obj[next[prop]] = next;
     return obj;
   }, obj)).map((i) => obj[i]);
 }
 
-function getExtensions() {
-    chrome.management.getAll(function(info){
-    // Extensions
+// function getExtensions() {
+//     chrome.management.getAll(function(info){
+//     // Extensions
 
-    if (appInventory != []) {
+//     if (appInventory != []) {
 
-      info.forEach( function(extension){
-        // console.logxr(extension)
-        var inventory_item = {};
-        inventory_item.name = extension.name;
-        inventory_item.bundleid = extension.id;
-        inventory_item.version= extension.version;
-        inventory_item.install_type = extension.installType;
-        inventory_item.description = extension.description;
-        appInventory.push(inventory_item)
-      });
+//       info.forEach( function(extension){
+//         // console.logxr(extension)
+//         var inventory_item = {};
+//         inventory_item.name = extension.name;
+//         inventory_item.bundleid = extension.id;
+//         inventory_item.version= extension.version;
+//         inventory_item.install_type = extension.installType;
+//         inventory_item.description = extension.description;
+//         appInventory.push(inventory_item)
+//       });
 
-    }
+//     }
 
-    callbackCount++;
-    console.log('Extension list callback');
-    });
-}
+//     callbackCount++;
+//     console.log('Extension list callback');
+//     });
+// }
 
-function getSettings(){
-  chrome.runtime.getPackageDirectoryEntry(function (dirEntry) {
-    dirEntry.getFile("settings.json", undefined, function (fileEntry) {
-    fileEntry.file(function (file) {
-            var reader = new FileReader()
-            reader.addEventListener("load", function (event) {
-                // data now in reader.result
-                var settings = JSON.parse(reader.result);
-                console.log('Using local settings file');
-                console.log(settings.debug);
-                data.key = settings.key;
-                serverURL = settings.serverurl;
-                debug = settings.debug;
-                callbackCount++;
-                settingsSet = true;
-                return;
-            });
-            reader.readAsText(file);
+/**
+ * Read settings from local file, fall back to managed settings.
+ * 
+ * @returns {Promise} 
+ */
+function getSettings() {
+  return new Promise(function (resolve, reject) {
+    chrome.runtime.getPackageDirectoryEntry(function (dirEntry) {
+      dirEntry.getFile("settings.json", undefined, function (fileEntry) {
+        fileEntry.file(function (file) {
+          var reader = new FileReader()
+          reader.addEventListener("load", function (event) {
+            // data now in reader.result
+            var settings = JSON.parse(reader.result);
+            console.log('Using local settings file');
+            console.log(settings.debug);
+            // data.key = settings.key;
+            // serverURL = settings.serverurl;
+            // debug = settings.debug;
+            resolve(settings);
+          });
+          reader.readAsText(file);
         });
-    }, function (e) {
-        //console.log(e);
+      }, function (e) {
+        reject(e);
+      });
     });
   });
-  chrome.storage.managed.get(null, function(adminConfig) {
-
-    //console.log("chrome.storage.managed.get adminConfig: ", adminConfig);
-    data.key = adminConfig['key'];
-    serverURL = adminConfig['serverurl'];
-    settingsSet = true;
-    callbackCount++;
-  });
-  // console.log(data.key);
-
-
 }
 
-function notRunningMessage() {
-  console.log('Not running on a managed device, not sending report');
-  renderStatus('Only functional on a managed Chrome OS device');
-  chrome.browserAction.setIcon({
-    path : "./icons/inactive_128.png"
+function getManagedSettings() {
+  return new Promise(function (resolve, reject) {
+    try {
+      chrome.storage.managed.get(null, function (adminConfig) {
+        resolve(adminConfig);
+      });
+    } catch (e) {
+      reject(e);
+    }
   });
+}
+
+
+// function notRunningMessage() {
+//   console.log('Not running on a managed device, not sending report');
+//   renderStatus('Only functional on a managed Chrome OS device');
+//   chrome.browserAction.setIcon({
+//     path : "./icons/inactive_128.png"
+//   });
+// }
+
+/**
+ * Collect all information for submission.
+ * 
+ * @param {*} settings Object literal containing settings.
+ */
+function collect(settings) {
+  console.dir(settings);
+
+  if (!settings.serverurl) {
+    throw new TypeError("Settings does not contain a `serverurl` key. We cannot submit data to a server.");
+  }
+
+  Promise.all([
+    getDirectoryId(),
+    getDeviceName(),
+    getCPUInfo(),
+    getStorageInfo(),
+    getMemoryInformation(),
+    getInstalledExtensions(),
+    getUserInfo()
+  ]).then(function (results) {
+    let deviceSerial = results[0];
+    let deviceName = results[1];
+    let cpuInfo = results[2];
+    let storageInfo = results[3];
+    let memoryInfo = results[4];
+    let extensions = results[5];
+    let userInfo = results[6];
+
+    console.dir(results);
+  });
+}
+
+/**
+ * Create a report object in the format originally designed by gg.
+ * 
+ * report
+ * 
+ * {
+ *  MachineInfo: {
+ *   HardwareInfo: {
+ *   
+ *   }
+ *  }
+ * }
+ * 
+ * @param {Array} results Array of promise resolutions from collect()
+ */
+function createReport(results) {
+  let memoryTotalGB = formatMemoryInfo(results[4]);
+
+  var report = {
+    MachineInfo: {
+      HardwareInfo: {}
+    }
+  };
+
+
 }
 
 function main() {
 
-  getSettings();
-  waitForSettings(function() {
-  guid();
-  getExtensionVersion();
-  getDeviceSerial();
-  getDeviceName();
-  getCPUInfo();
-  getStorageInfo();
-  getOsVersion();
-  getMemInfo();
-  getExtensions();
-  getConsoleUser();
-
-  continueExec();
-  });
-
+  getSettings().then(function (settings) {
+    return collect(settings);
+  }).catch(function (err) {
+    console.log(err);
+    // return getManagedSettings().then(function (managedSettings) {
+    //   return collect(managedSettings);
+    // });
+  }).catch(function (err) {
+    console.log(err);
+  })
 }
 
-document.addEventListener('DOMContentLoaded', function() {
+document.addEventListener('DOMContentLoaded', function () {
   main()
 });
