@@ -236,37 +236,30 @@ function sendData(){
     console.log(data);
   }
   // console.log(buildInventoryPlist(appInventory));
-  jQuery.ajax({
-      type: "POST",
-      url: serverURL + '/checkin/',
-      data: data,
-      beforeSend: function (xhr) {
-        xhr.setRequestHeader ("Authorization", "Basic " + btoa("sal:" + data.key));
-      },
-      success: function(received) {
-          console.log(received);
-          jQuery.ajax({
-              type: "POST",
-              url: serverURL + '/inventory/submit/',
-              data: data,
-              beforeSend: function (xhr) {
-                xhr.setRequestHeader ("Authorization", "Basic " + btoa("sal:" + data.key));
-              },
-              success: function(received) {
-                console.log(received);
-              },
-              error: function(received) {
-                console.log(received.responseText);
-                console.log('Auth: ' + btoa("sal:" + data.key));
-                console.log(data);
-              },
-          });
-      },
-      error: function(received) {
-          console.log(received.responseText);
-      }
-  });
 
+  fetch(serverURL + '/checkin/', {
+    method: 'post',
+    headers: {
+      "Authorization": "Basic " + btoa("sal:" + data.key)
+    },
+    body: data
+  }).then(function (data) {
+    return data.json();
+  }).then(function (received) {
+    return fetch(serverURL + '/inventory/submit/', {
+      method: 'post',
+      headers: {
+        "Authorization": "Basic " + btoa("sal:" + data.key)
+      },
+      body: data
+    })
+  }).then(function (data) {
+    return data.json();
+  }).then(function (received) {
+    console.log(received);
+  }).catch(function (error) {
+    console.log(error);
+  });
 }
 
 async function getDeviceSerial() {
