@@ -480,6 +480,19 @@ function collect(settings) {
 }
 
 /**
+ * Create the check in data in the format originally designed by gg.
+ * 
+ * @param {Array} results Array of promise resolutions from collect()
+ */
+function createCheckInData(results) {
+  var data = {
+    username: results[6].email
+  }
+
+  return data;
+}
+
+/**
  * Create a report object in the format originally designed by gg.
  * 
  * report
