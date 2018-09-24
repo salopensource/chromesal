@@ -2,6 +2,49 @@
  * The meat of ChromeSal.
  **/
 
+const DEFAULT_SETTINGS = {
+  serverurl: '',
+  checkinurl: '',
+  submiturl: '',
+  debug: false,
+  key: '',
+}
+
+/**
+* Get settings that are being centrally managed for this extension via G-Admin.
+* 
+* @returns {Promise}
+*/
+function getManagedSettings() {
+  return new Promise(function (resolve, reject) {
+      try {
+          chrome.storage.managed.get(null, function (adminConfig) {
+              resolve(adminConfig);
+          });
+      } catch (e) {
+          reject(e);
+      }
+  });
+}
+
+/**
+* Get settings that were defined by the current chrome user.
+* 
+* @returns {Promise}
+*/
+function getLocalSettings() {
+  return new Promise(function (resolve, reject) {
+      try {
+          chrome.storage.sync.get(DEFAULT_SETTINGS, function (items) {
+              resolve(items);
+          });
+      } catch (e) {
+          reject(e);
+      }
+  });
+}
+
+
 function renderStatus(statusText) {
   try {
     document.getElementById('status').textContent = statusText;
@@ -158,12 +201,32 @@ function getCPUInfo() {
   return new Promise(function (resolve, reject) {
     try {
       chrome.system.cpu.getInfo(function (cpuInfo) {
-        resolve(cpuInfo);
+        resolve(prepareCPUInfo(cpuInfo));
       });
     } catch (err) {
       reject(err);
     }
   });
+}
+
+/**
+ * Format CPU information for Sal.
+ * 
+ * @param {Object} cpuInfo Result from chrome.system.cpu.getInfo
+ */
+function prepareCPUInfo(cpuInfo) {
+  let cpu_array = cpuInfo.modelName.split('@');
+  let cpu_type = cpu_array[0].trim();
+  if (cpu_type.endsWith('CPU ')) {
+    cpu_type = cpu_type.slice(0, -4).trim();
+  }
+
+  let current_processor_speed = cpu_array[1].trim();
+
+  return {
+    cpu_type: cpu_type,
+    current_processor_speed: current_processor_speed,
+  };
 }
 
 /**
@@ -208,23 +271,15 @@ function getStorageInfo() {
   });
 }
 
-
-function formatCPUInfo(cpuInfo) {
-  // console.log(info);
-  var cpu_array = info.modelName.split('@');
-  report.MachineInfo.HardwareInfo.cpu_type = cpu_array[0].trim();
-  if (report.MachineInfo.HardwareInfo.cpu_type.endsWith('CPU ')) {
-    report.MachineInfo.HardwareInfo.cpu_type = report.MachineInfo.HardwareInfo.cpu_type.slice(0, -4).trim()
-  }
-  report.MachineInfo.HardwareInfo.current_processor_speed = cpu_array[1].trim();
-}
-
-function getOsVersion() {
+/**
+ * Get the Operating System version from the User-Agent string.
+ */
+function getOSVersion() {
   userAgentString = navigator.userAgent;
   if (/Chrome/.test(userAgentString)) {
-    report.MachineInfo.os_vers = userAgentString.match('Chrome/([0-9]*\.[0-9]*\.[0-9]*\.[0-9]*)')[1];
+    return userAgentString.match('Chrome/([0-9]*\.[0-9]*\.[0-9]*\.[0-9]*)')[1];
   } else {
-    report.MachineInfo.os_vers = 'UNKNOWN';
+    return 'UNKNOWN';
   }
 }
 
@@ -272,29 +327,6 @@ function isManagedInstall(extension) {
   return extension.install_type == 'admin';
 }
 
-
-// function addManagedInstalls(report, appInventory) {
-//   var root = [];
-//   if (report.hasOwnProperty('ManagedInstalls')) {
-//     return report;
-//   }
-//   appInventory.forEach(function (extension) {
-//     if (extension.install_type == 'admin') {
-//       var dict = {}
-//       dict.name = extension.name;
-//       dict.display_name = extension.display_name;
-//       dict.installed = true;
-//       dict.installed_version = extension.version;
-//       dict.installed_size = 0;
-//       root.push(dict);
-//     }
-//   });
-
-//   // console.log(root);
-//   report.ManagedInstalls = root;
-//   return report;
-// }
-
 /**
  * Submit a Check-in
  * 
@@ -303,7 +335,7 @@ function isManagedInstall(extension) {
  * @returns {Promise} A promise that resolves with the json response.
  */
 function checkIn(checkinData, settings) {
-  const checkInURL = settings.checkInURL || settings.serverurl + '/checkin/';
+  const checkInURL = settings.checkinurl || settings.serverurl + '/checkin/';
 
   return fetch(checkInURL, {
     method: 'post',
@@ -326,12 +358,12 @@ function checkIn(checkinData, settings) {
  * @returns {Promise} A promise that resolves with the json response.
  */
 function submitInventory(inventoryData, settings) {
-  const submitURL = settings.submitURL || settings.serverurl + '/inventory/submit/';
+  const submitURL = settings.submiturl || settings.serverurl + '/inventory/submit/';
 
   return fetch(submitURL, {
     method: 'post',
     headers: {
-      "Authorization": "Basic " + btoa("sal:" + data.key),
+      "Authorization": "Basic " + btoa("sal:" + settings.key),
       "Content-Type": "application/json;charset=utf-8",
       "Accept": "application/json;charset=utf-8",
     },
@@ -385,44 +417,6 @@ function getExtensionVersion() {
         reject(e);
       });
     });
-  });
-}
-
-
-/**
- * Read settings from local file, fall back to managed settings.
- * 
- * @returns {Promise} 
- */
-function getSettings() {
-  return new Promise(function (resolve, reject) {
-    chrome.runtime.getPackageDirectoryEntry(function (dirEntry) {
-      dirEntry.getFile("settings.json", undefined, function (fileEntry) {
-        fileEntry.file(function (file) {
-          var reader = new FileReader()
-          reader.addEventListener("load", function (event) {
-            var settings = JSON.parse(reader.result);
-            console.log('Using local settings file');
-            resolve(settings);
-          });
-          reader.readAsText(file);
-        });
-      }, function (e) {
-        reject(e);
-      });
-    });
-  });
-}
-
-function getManagedSettings() {
-  return new Promise(function (resolve, reject) {
-    try {
-      chrome.storage.managed.get(null, function (adminConfig) {
-        resolve(adminConfig);
-      });
-    } catch (e) {
-      reject(e);
-    }
   });
 }
 
@@ -532,9 +526,9 @@ function createReport(results) {
 
 function main() {
 
-  getSettings().then(collect).then(function (collection) {
+  getLocalSettings().then(collect).then(function (collection) {
     console.log(collection);
-    return checkIn(collection[0], collection[2]);
+    return submitInventory(collection[1], collection[2]);
   }).then(function (checkinResponse) {
     
   }).catch(function (err) {

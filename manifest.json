@@ -16,6 +16,10 @@
     "48": "icons/active_48.png",
     "128": "icons/active_128.png"
   },
+  "options_ui": {
+    "page": "settings.html",
+    "chrome_style": true
+  },
 
   "short_name": "ChromeSal",
   "permissions": [
