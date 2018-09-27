@@ -208,17 +208,30 @@ function getStorageInfo() {
   });
 }
 
-
+/**
+ * Format CPU Information into the structure required for Sal.
+ * 
+ * @param {*} cpuInfo CPU Information
+ * @returns {Object} containing keys "cpu_type" and "current_processor_speed".
+ */
 function formatCPUInfo(cpuInfo) {
-  // console.log(info);
-  var cpu_array = info.modelName.split('@');
-  report.MachineInfo.HardwareInfo.cpu_type = cpu_array[0].trim();
-  if (report.MachineInfo.HardwareInfo.cpu_type.endsWith('CPU ')) {
-    report.MachineInfo.HardwareInfo.cpu_type = report.MachineInfo.HardwareInfo.cpu_type.slice(0, -4).trim()
+  let cpu_array = cpuInfo.modelName.split('@');
+  let cpu_type = cpu_array[0].trim();
+  if (rcpu_type.endsWith('CPU ')) {
+    cpu_type = cpu_type.slice(0, -4).trim()
   }
-  report.MachineInfo.HardwareInfo.current_processor_speed = cpu_array[1].trim();
+
+  return {
+    "cpu_type": cpu_type,
+    "current_processor_speed": cpu_array[1].trim()
+  };
 }
 
+/**
+ * Extract the Chrome version from the User Agent.
+ * 
+ * @returns {String} Chrome version
+ */
 function getOsVersion() {
   userAgentString = navigator.userAgent;
   if (/Chrome/.test(userAgentString)) {
@@ -488,16 +501,7 @@ function createCheckInData(results) {
 
 /**
  * Create a report object in the format originally designed by gg.
- * 
- * report
- * 
- * {
- *  MachineInfo: {
- *   HardwareInfo: {
- *   
- *   }
- *  }
- * }
+ * Described in `sal/3rdpartyclients.md`.
  * 
  * @param {Array} results Array of promise resolutions from collect()
  */
@@ -512,16 +516,17 @@ function createReport(results) {
   let manifest = results[7];
 
   let memoryTotalGB = formatMemoryInfo(memoryInfo);
+  let cpuInfoFormatted = formatCPUInfo(cpuInfo);
 
-  var report = {
-    os_family: "ChromeOS",
-    AvailableDiskSpace: storageInfo.length > 0 ? storageInfo[0].capacity : null,
+  var report = {    
     ManagedInstalls: extensions.filter(isManagedInstall),
     MachineInfo: {
-      os_vers: "UNKNOWN",
+      "os_vers": getOsVersion(),
+      "disk_size": storageInfo.length > 0 ? storageInfo[0].capacity : null,
+      "os_family": "ChromeOS",
       HardwareInfo: {
-        cpu_type: null,
-        current_processor_speed: null,
+        cpu_type: cpuInfoFormatted.cpu_type,
+        current_processor_speed: cpuInfoFormatted.current_processor_speed,
         physical_memory: memoryTotalGB,
       }
     }
