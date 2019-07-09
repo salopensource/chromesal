@@ -18,6 +18,7 @@ var settingsSet = false;
 
 var key = '';
 var serverURL = '';
+var legacyCheckin = false;
 
 function renderStatus(statusText) {
   try {
@@ -34,7 +35,7 @@ function sendBackDeviceName(device_name){
   } else {
     data.name = 'Chrome OS Device';
   }
-  
+
 }
 
 function getDeviceName() {
@@ -172,24 +173,42 @@ function buildInventoryPlist(appInventory){
 }
 
 function addManagedInstalls(report, appInventory){
-  var root = [];
+
   if (report.hasOwnProperty('ManagedInstalls')) {
     return report;
   }
-  appInventory.forEach( function(extension){
-    if (extension.install_type == 'admin') {
-      var dict = {}
-      dict.name = extension.name;
-      dict.display_name = extension.display_name;
-      dict.installed = true;
-      dict.installed_version = extension.version;
-      dict.installed_size = 0;
-      root.push(dict);
-    }
-  });
+  if (legacyCheckin == true) {
+    var root = [];
+    appInventory.forEach( function(extension){
+      if (extension.install_type == 'admin') {
+        var dict = {}
+        dict.name = extension.name;
+        dict.display_name = extension.display_name;
+        dict.installed = true;
+        dict.installed_version = extension.version;
+        dict.installed_size = 0;
+        root.push(dict);
+      }
+    });
+    report.ManagedInstalls = root;
+  } else {
+    report.ManagedInstalls = {}
+    appInventory.forEach ( function(extension){
+      if (extension.install_type == 'admin') {
+        report.ManagedInstalls[extension.name] = {
+          'status': 'PRESENT',
+          'data': {
+            'type': "Extension"
+          }
+        }
+      }
+    });
 
-  // console.log(root);
-  report.ManagedInstalls = root;
+
+    // console.log(report.ManagedInstalls);
+
+  }
+
   return report;
 }
 
@@ -219,23 +238,61 @@ function checkForData(){
   }
 }
 
+function sal4ReportFormat(report){
+  out = {};
+  out.Machine = {};
+  out.Chrome = {};
+  new_report = {
+      'serial': data.serial,
+      'hostname': data.serial,
+			'console_user': data.username,
+			'os_family': report.os_family,
+			'operating_system': report.MachineInfo.os_vers,
+			'hd_space': report.AvailableDiskSpace,
+			'cpu_type': report.MachineInfo.cpu_type,
+			'cpu_speed': report.MachineInfo.current_processor_speed,
+			'memory': report.MachineInfo.HardwareInfo.physical_memory
+  };
+
+  out.Machine.extra_data = new_report;
+  // console.log(report.ManagedInstalls);
+  out.Chrome.managed_items = report.ManagedInstalls;
+  out.Sal = {}
+  out.Chrome.facts = {'checkin_module_version': data.sal_version}
+  out.Sal.facts = {'checkin_module_version': data.sal_version}
+  out.Machine.facts = {'checkin_module_version': data.sal_version}
+  out.Sal.extra_data = {'key': data.key, 'sal_version': data.sal_version}
+  // out.key = data.key
+  return out
+}
+
 function sendData(){
   report.os_family = 'ChromeOS';
-
   report = addManagedInstalls(report, appInventory);
-  var reportPlist = PlistParser.toPlist(report);
+
+  if (legacyCheckin === true){
+    var reportPlist = PlistParser.toPlist(report);
+    data.base64report = btoa(reportPlist);
+    if (debug===true){
+      console.log(data);
+    }
+  } else{
+    var reportJson = JSON.stringify(sal4ReportFormat(report))
+    if (debug===true){
+      console.log(reportJson);
+    }
+  }
+
   var inventoryPlist = buildInventoryPlist(appInventory);
   // console.log(reportPlist);
-  // console.log(data);
-  data.base64report = btoa(reportPlist);
-  data.base64inventory = btoa(unescape(encodeURIComponent(inventoryPlist)));
+
+
   // console.log(inventoryPlist)
   // console.log(buildInventoryPlist(appInventory));
   // console.log(data)
-  if (debug===true){
-    console.log(data);
-  }
   // console.log(buildInventoryPlist(appInventory));
+  // console.log("legacyCheckin: "+legacyCheckin)
+  if (legacyCheckin === true){
   jQuery.ajax({
       type: "POST",
       url: serverURL + '/checkin/',
@@ -245,6 +302,7 @@ function sendData(){
       },
       success: function(received) {
           console.log(received);
+          data.base64inventory = btoa(unescape(encodeURIComponent(inventoryPlist)));
           jQuery.ajax({
               type: "POST",
               url: serverURL + '/inventory/submit/',
@@ -266,6 +324,41 @@ function sendData(){
           console.log(received.responseText);
       }
   });
+ } else {
+  jQuery.ajax({
+    type: "POST",
+    url: serverURL + '/checkin/',
+    data: reportJson,
+    contentType:"application/json",
+    dataType:"json",
+    beforeSend: function (xhr) {
+      xhr.setRequestHeader ("Authorization", "Basic " + btoa("sal:" + key));
+    },
+    success: function(received) {
+        console.log(received);
+        data.base64inventory = btoa(unescape(encodeURIComponent(inventoryPlist)));
+        jQuery.ajax({
+            type: "POST",
+            url: serverURL + '/inventory/submit/',
+            data: data,
+            beforeSend: function (xhr) {
+              xhr.setRequestHeader ("Authorization", "Basic " + btoa("sal:" + key));
+            },
+            success: function(received) {
+              console.log(received);
+            },
+            error: function(received) {
+              console.log(received.responseText);
+              console.log('Auth: ' + btoa("sal:" + key));
+              console.log(data);
+            },
+        });
+    },
+    error: function(received) {
+        console.log(received.responseText);
+    }
+});
+ }
 
 }
 
@@ -280,12 +373,6 @@ async function getDeviceSerial() {
       }
     }
   });
-  // console.log('Is chrome: '+is_chrome);
-  // if (is_chrome === false) {
-  //   doNotSend = true;
-  //   // notRunnngMessage();
-  // }
-
   try {
       chrome.enterprise.deviceAttributes.getDirectoryDeviceId(async deviceId => {
           // renderStatus(deviceId);
@@ -381,8 +468,10 @@ function getSettings(){
                 console.log('Using local settings file');
                 console.log(settings.debug);
                 data.key = settings.key;
+                key = settings.key;
                 serverURL = settings.serverurl;
                 debug = settings.debug;
+                legacyCheckin = settings.legacycheckin;
                 callbackCount++;
                 settingsSet = true;
                 return;
@@ -395,9 +484,15 @@ function getSettings(){
   });
   chrome.storage.managed.get(null, function(adminConfig) {
 
-    //console.log("chrome.storage.managed.get adminConfig: ", adminConfig);
+    console.log("chrome.storage.managed.get adminConfig: ", adminConfig);
     data.key = adminConfig['key'];
+    key = adminConfig['key'];
     serverURL = adminConfig['serverurl'];
+    if ("legacycheckin" in adminConfig) {
+      legacyCheckin = adminConfig['legacycheckin'];
+    }
+
+
     settingsSet = true;
     callbackCount++;
   });
