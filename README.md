@@ -11,9 +11,9 @@ The built extension can be found on the [Chrome Web Store](https://chrome.google
 
 The extension has been restricted to Chrome OS devices only, and will not function if the above two conditions are not met. This extension relies on APIs that are only available to enterprise enrolled devices, so does not function when installed manually.
 
-## Sal v4
+## Making Custom Extension Versions
 
-To work with Sal 4 you will need to upload the extension to the Chrome Web Store for your organization.
+If you want to deploy your own version of ChromeSal you will need to upload it to the Chrome Web Store for your organization.  You might want to do this to run a pre-release version, or to create a custom version seperate from the official ChromeSal extension.
 
 * Download the ChromeSal repository
 * Go to [https://chrome.google.com/webstore/developer/dashboard](https://chrome.google.com/webstore/developer/dashboard), pay the $5 fee, and **Add new item**
