@@ -40,7 +40,7 @@ function sendBackDeviceName(device_name){
 
 function getDeviceName() {
   try {
-    chrome.enterprise.deviceAttributes.getDeviceAssetId(sendBackDeviceName);
+    chrome.enterprise.deviceAttributes.getDeviceSerialNumber(sendBackDeviceName);
   }
   catch(err) {
     callbackCount++;
