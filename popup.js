@@ -11,7 +11,7 @@ var report = {};
 report.MachineInfo = {};
 report.MachineInfo.HardwareInfo = {};
 var callbackCount = 0;
-var callbackTotal = 10;
+var callbackTotal = 11;
 var doNotSend = false;
 var appInventory = [];
 var settingsSet = false;
@@ -28,25 +28,40 @@ function renderStatus(statusText) {
   }
 }
 
-function sendBackDeviceName(device_name){
-  callbackCount++;
-  if (device_name) {
-    data.name = device_name;
-  } else {
-    data.name = 'Chrome OS Device';
-  }
-
-}
-
-function getDeviceName() {
+async function getDeviceName() {
+// Will attempt to getDeviceHostname (coming in 83), then getDeviceAssetId,
+// and finally fallback to "Chrome OS Device" 
   try {
-    chrome.enterprise.deviceAttributes.getDeviceSerialNumber(sendBackDeviceName);
+    chrome.enterprise.deviceAttributes.getDeviceHostname(async hostname => {
+      data.name = hostname;
+      if (data.name === '') {
+        throw 'No Hostname returned'
+      }
+    });
   }
-  catch(err) {
+    catch(err) {
+      if (debug === true){
+        console.log('No Hostname');
+        console.log(err);
+      }
+      try {
+        // Now try AssetID
+        chrome.enterprise.deviceAttributes.getDeviceAssetId(async assetId => {
+          data.name = assetId;
+          if (data.name === '') {
+            throw 'No AssetId returned'
+          }
+        });
+      }
+      catch(err) {
+        data.name = 'Chrome OS Device';
+        if (debug === true){
+          console.log('No AssetId');
+          console.log(err);
+        }
+      }
+    }
     callbackCount++;
-    data.name = 'Chrome OS Device';
-  }
-
 }
 
 function getConsoleUser(){
@@ -65,8 +80,8 @@ function sendBackCPUInfo(info) {
   // console.log(info);
   var cpu_array = info.modelName.split('@');
   report.MachineInfo.HardwareInfo.cpu_type = cpu_array[0].trim();
-  if (report.MachineInfo.HardwareInfo.cpu_type.endsWith('CPU ')){
-    report.MachineInfo.HardwareInfo.cpu_type = report.MachineInfo.HardwareInfo.cpu_type.slice(0, -4).trim()
+  if (report.MachineInfo.HardwareInfo.cpu_type.endsWith('CPU')) {
+    report.MachineInfo.HardwareInfo.cpu_type = report.MachineInfo.HardwareInfo.cpu_type.slice(0, -4).trim();
   }
   report.MachineInfo.HardwareInfo.current_processor_speed = cpu_array[1].trim();
   callbackCount++;
@@ -102,8 +117,9 @@ function getMemInfo() {
 }
 
 function sendBackMem(info) {
-  // console.log(info);
-  report.MachineInfo.HardwareInfo.physical_memory = (info.capacity/1000000000).toFixed(2) + ' GB';
+  // console.log(info);  
+  report.MachineInfo.HardwareInfo.physical_memory = (info.capacity/1073741824).toFixed(2) + ' GB';
+  report.MachineInfo.HardwareInfo.physical_memory_kb = (info.capacity/1024);
   callbackCount++;
 }
 
@@ -118,7 +134,7 @@ function s4() {
     .toString(16)
     .substring(1);
 }
-
+/* Two functions with the same name
 function waitForSettings() {
   // Wait for settings to have run before carrying on
   if (settingsSet !== true) {
@@ -126,7 +142,7 @@ function waitForSettings() {
     setTimeout(waitForSettings, 1000);
   }
 }
-
+*/
 
 function waitForSettings(callback) {
   if (settingsSet === true) {
@@ -244,14 +260,18 @@ function sal4ReportFormat(report){
   out.Chrome = {};
   new_report = {
       'serial': data.serial,
-      'hostname': data.serial,
-			'console_user': data.username,
-			'os_family': report.os_family,
-			'operating_system': report.MachineInfo.os_vers,
-			'hd_space': report.AvailableDiskSpace,
-			'cpu_type': report.MachineInfo.cpu_type,
-			'cpu_speed': report.MachineInfo.current_processor_speed,
-			'memory': report.MachineInfo.HardwareInfo.physical_memory
+      'hostname': data.name,
+      'console_user': data.username,
+      'os_family': report.os_family,
+      'operating_system': report.MachineInfo.os_vers,
+      'hd_space': report.AvailableDiskSpace,
+      'cpu_type': report.MachineInfo.HardwareInfo.cpu_type,
+      'cpu_speed': report.MachineInfo.HardwareInfo.current_processor_speed,
+      'memory': report.MachineInfo.HardwareInfo.physical_memory,
+      'memory_kb': report.MachineInfo.HardwareInfo.physical_memory_kb,
+      'machine_model': "Chrome OS Device",
+      'machine_model_friendly': "Chrome OS Device"
+      
   };
 
   out.Machine.extra_data = new_report;
@@ -374,10 +394,10 @@ async function getDeviceSerial() {
     }
   });
   try {
-      chrome.enterprise.deviceAttributes.getDirectoryDeviceId(async deviceId => {
-          // renderStatus(deviceId);
-          // console.log(deviceId);
-          data.serial = deviceId.toUpperCase();
+      chrome.enterprise.deviceAttributes.getDeviceSerialNumber(async serialNumber => {
+          // renderStatus(serialNumber);
+          // console.log(serialNumber);
+          data.serial = serialNumber.toUpperCase();
           if (data.serial === '') {
             throw 'No Serial returned'
             if (debug === false) {
