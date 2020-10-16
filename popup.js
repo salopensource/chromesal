@@ -374,7 +374,7 @@ async function getDeviceSerial() {
     }
   });
   try {
-      chrome.enterprise.deviceAttributes.getDirectoryDeviceId(async deviceId => {
+      chrome.enterprise.deviceAttributes.getDeviceSerialNumber(async deviceId => {
           // renderStatus(deviceId);
           // console.log(deviceId);
           data.serial = deviceId.toUpperCase();
