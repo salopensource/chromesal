@@ -245,6 +245,7 @@ function sal4ReportFormat(report){
   new_report = {
       'serial': data.serial,
       'hostname': data.serial,
+      'device_id': data.google_device_identifier,
 			'console_user': data.username,
 			'os_family': report.os_family,
 			'operating_system': report.MachineInfo.os_vers,
@@ -361,6 +362,46 @@ function sendData(){
  }
 
 }
+
+async function getGoogleDeviceIdentifier() {
+  // We are only going to run on a Chrome OS device
+  chrome.runtime.getPlatformInfo(async function(info) {
+    //console.log(info)
+    if (!info.os.toLowerCase().includes('cros')){
+      if (debug === false) {
+        console.log('Not cros and not debug')
+        doNotSend = true;
+      }
+    }
+  });
+  try {
+      chrome.enterprise.deviceAttributes.getDirectoryDeviceId(async google_deviceId => {
+          // renderStatus(deviceId);
+          // console.log(deviceId);
+          data.google_device_identifier = google_deviceId.toUpperCase();
+          if (data.google_device_identifier === '') {
+            throw 'No Google Identifier returned'
+            if (debug === false) {
+              console.log('setting do not send to true due to no serial being returned and not being debug')
+              doNotSend = true;
+            }
+          }
+      });
+    }
+    catch(err) {
+      data.google_device_identifier = 'abc123'.toUpperCase();
+      console.log('Not a managed chrome device');
+      if (debug === true){
+        console.log(err);
+      }
+      if (debug === false) {
+        console.log('setting do not send to true due to no serial error and not being debug')
+        doNotSend = true;
+      }
+    }
+    callbackCount++;
+}
+
 
 async function getDeviceSerial() {
   // We are only going to run on a Chrome OS device
@@ -516,6 +557,7 @@ function main() {
   guid();
   getExtensionVersion();
   getDeviceSerial();
+  getGoogleDeviceIdentifier();
   getDeviceName();
   getCPUInfo();
   getStorageInfo();
