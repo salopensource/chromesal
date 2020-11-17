@@ -11,7 +11,7 @@ var report = {};
 report.MachineInfo = {};
 report.MachineInfo.HardwareInfo = {};
 var callbackCount = 0;
-var callbackTotal = 10;
+var callbackTotal = 11;
 var doNotSend = false;
 var appInventory = [];
 var settingsSet = false;
@@ -262,7 +262,7 @@ function sal4ReportFormat(report){
   out.Sal.facts = {'checkin_module_version': data.sal_version}
   out.Machine.facts = {
     'checkin_module_version': data.sal_version,
-    'Google_Device_ID': data.google_device_identifier
+    'google_gevice_id': data.google_device_identifier
   };
   out.Sal.extra_data = {'key': data.key, 'sal_version': data.sal_version}
   // out.key = data.key
