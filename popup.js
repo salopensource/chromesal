@@ -11,7 +11,7 @@ var report = {};
 report.MachineInfo = {};
 report.MachineInfo.HardwareInfo = {};
 var callbackCount = 0;
-var callbackTotal = 10;
+var callbackTotal = 11;
 var doNotSend = false;
 var appInventory = [];
 var settingsSet = false;
@@ -260,7 +260,10 @@ function sal4ReportFormat(report){
   out.Sal = {}
   out.Chrome.facts = {'checkin_module_version': data.sal_version}
   out.Sal.facts = {'checkin_module_version': data.sal_version}
-  out.Machine.facts = {'checkin_module_version': data.sal_version}
+  out.Machine.facts = {
+    'checkin_module_version': data.sal_version,
+    'google_gevice_id': data.google_device_identifier
+  };
   out.Sal.extra_data = {'key': data.key, 'sal_version': data.sal_version}
   // out.key = data.key
   return out
@@ -362,6 +365,46 @@ function sendData(){
 
 }
 
+async function getGoogleDeviceIdentifier() {
+  // We are only going to run on a Chrome OS device
+  chrome.runtime.getPlatformInfo(async function(info) {
+    //console.log(info)
+    if (!info.os.toLowerCase().includes('cros')){
+      if (debug === false) {
+        console.log('Not cros and not debug')
+        doNotSend = true;
+      }
+    }
+  });
+  try {
+      chrome.enterprise.deviceAttributes.getDirectoryDeviceId(async google_deviceId => {
+          // renderStatus(deviceId);
+          // console.log(deviceId);
+          data.google_device_identifier = google_deviceId.toUpperCase();
+          if (data.google_device_identifier === '') {
+            throw 'No Google Identifier returned'
+            if (debug === false) {
+              console.log('setting do not send to true due to no serial being returned and not being debug')
+              doNotSend = true;
+            }
+          }
+      });
+    }
+    catch(err) {
+      data.google_device_identifier = 'abc123'.toUpperCase();
+      console.log('Not a managed chrome device');
+      if (debug === true){
+        console.log(err);
+      }
+      if (debug === false) {
+        console.log('setting do not send to true due to no serial error and not being debug')
+        doNotSend = true;
+      }
+    }
+    callbackCount++;
+}
+
+
 async function getDeviceSerial() {
   // We are only going to run on a Chrome OS device
   chrome.runtime.getPlatformInfo(async function(info) {
@@ -374,7 +417,7 @@ async function getDeviceSerial() {
     }
   });
   try {
-      chrome.enterprise.deviceAttributes.getDirectoryDeviceId(async deviceId => {
+      chrome.enterprise.deviceAttributes.getDeviceSerialNumber(async deviceId => {
           // renderStatus(deviceId);
           // console.log(deviceId);
           data.serial = deviceId.toUpperCase();
@@ -516,6 +559,7 @@ function main() {
   guid();
   getExtensionVersion();
   getDeviceSerial();
+  getGoogleDeviceIdentifier();
   getDeviceName();
   getCPUInfo();
   getStorageInfo();
