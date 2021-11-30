@@ -262,7 +262,7 @@ function sal4ReportFormat(report){
   out.Sal.facts = {'checkin_module_version': data.sal_version}
   out.Machine.facts = {
     'checkin_module_version': data.sal_version,
-    'google_gevice_id': data.google_device_identifier
+    'google_device_id': data.google_device_identifier
   };
   out.Sal.extra_data = {'key': data.key, 'sal_version': data.sal_version}
   // out.key = data.key
