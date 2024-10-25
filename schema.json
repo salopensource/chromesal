@@ -8,10 +8,6 @@
     },
     "key": {
       "type": "string"
-    },
-    "legacycheckin": {
-      "title": "Use legacy checkin method (pre-Sal-4)",
-      "type": "boolean"
     }
   }
 }

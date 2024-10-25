@@ -7,7 +7,7 @@ The built extension can be found on the [Chrome Web Store](https://chrome.google
 ## Requirements
 
 * The Chrome OS device _must_ be enterprise enrolled.
-* The extension _must_ be installed via the G-Suite policy
+* The extension _must_ be installed via Google Workspace policy
 
 The extension has been restricted to Chrome OS devices only, and will not function if the above two conditions are not met. This extension relies on APIs that are only available to enterprise enrolled devices, so does not function when installed manually.
 
@@ -36,7 +36,7 @@ If you want to deploy your own version of ChromeSal you will need to upload it t
 }
 ```
 
-You must apply the above configuration file using G-Suite admin.
+You must apply the above configuration file using Google admin.
 
 ## Contributing
 
@@ -54,8 +54,7 @@ If you wish to run the code locally (via Chrome's 'unpacked extension' feature),
 
 If you wish to test on a non-enterprise enrolled / non-chrome OS device, set `debug` to `true`. Note that this will produce the serial number of `ABC123`, as the device's Cloud ID is not avaialble to non-enterprise enrolled devices.
 
-
 ## Credits
-https://github.com/pugetive/plist_parser
+<https://github.com/pugetive/plist_parser>
 
 Icon: Monitor by Astonish from the [Noun Project](https://thenounproject.com)
