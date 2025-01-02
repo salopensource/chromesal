@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "ChromeSal",
   "description": "This extension allows ChromeOS devices to report to Sal. This extension must be installed on a managed device to function.",
-  "version": "3.0.0",
+  "version": "3.1.0",
   "background": {
     "service_worker": "background.js"
   },
@@ -32,7 +32,7 @@
     "default_popup": "popup.html"
   },
   "content_security_policy": {
-    "service_worker": "script-src 'self'; object-src 'self'"
+    "service_worker": "script-src 'self' 'unsafe-eval'; object-src 'self'"
   },
   "host_permissions": ["https://*/*", "http://*/*"]
 }
